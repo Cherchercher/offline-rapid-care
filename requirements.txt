@@ -1,0 +1,34 @@
+# Core Flask and web dependencies
+Flask==2.3.3
+Flask-CORS==4.0.0
+Werkzeug==3.0.1
+
+# Database and sync - use psycopg3 for better Flask compatibility
+psycopg[binary]>=3.1.0
+
+# Image and video processing - using more compatible versions
+Pillow>=10.0.0
+opencv-python-headless==4.8.1.78
+numpy<2.0.0
+imageio>=2.31.0
+imageio-ffmpeg>=0.4.8
+pytesseract>=0.3.10
+
+# AI/ML dependencies - simplified for macOS
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
+transformers>=4.40.0
+
+# Additional dependencies for better macOS compatibility
+setuptools>=68.0.0
+wheel>=0.41.0
+accelerate>=0.24.0
+protobuf>=4.24.0
+
+# Audio processing
+SpeechRecognition>=3.10.0
+pydub>=0.25.1
+
+# Ollama client
+ollama>=0.1.7

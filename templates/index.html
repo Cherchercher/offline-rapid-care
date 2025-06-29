@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RapidCare - MCI Response System</title>
+    <meta name="description" content="AI-powered mass casualty incident response system">
+    <meta name="theme-color" content="#dc2626">
+    <link rel="manifest" href="/static/manifest.json">
+    <link rel="icon" type="image/png" href="/static/images/icon-192x192.png">
+    <link rel="apple-touch-icon" href="/static/images/icon-192x192.png">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/css/style.css" rel="stylesheet">
+</head>
+<body>
+    <div id="app">
+        <!-- Login Screen -->
+        <div id="login-screen" class="login-screen">
+            <div class="login-container">
+                <div class="login-header">
+                    <div class="logo">
+                        <i class="fas fa-heartbeat"></i>
+                        <h1>RapidCare</h1>
+                    </div>
+                    <p class="login-subtitle">Mass Casualty Incident Response System</p>
+                </div>
+                
+                <div class="login-options">
+                    <h2>Select Your Role</h2>
+                    <div class="role-cards">
+                        <div class="role-card" data-role="PARAMEDIC">
+                            <div class="role-icon">
+                                <i class="fas fa-ambulance"></i>
+                            </div>
+                            <h3>Paramedic</h3>
+                            <p>Emergency field assessment and triage</p>
+                        </div>
+                        
+                        <div class="role-card" data-role="NURSE">
+                            <div class="role-icon">
+                                <i class="fas fa-user-nurse"></i>
+                            </div>
+                            <h3>Nurse</h3>
+                            <p>Patient monitoring and vital updates</p>
+                        </div>
+                        
+                        <div class="role-card" data-role="DOCTOR">
+                            <div class="role-icon">
+                                <i class="fas fa-user-md"></i>
+                            </div>
+                            <h3>Doctor</h3>
+                            <p>Medical assessment and SOAP notes</p>
+                        </div>
+                        
+                        <div class="role-card" data-role="REUNIFICATION_COORDINATOR">
+                            <div class="role-icon">
+                                <i class="fas fa-users"></i>
+                            </div>
+                            <h3>Reunification Coordinator</h3>
+                            <p>Family location and patient matching</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="login-footer">
+                    <div class="status-indicators">
+                        <div class="status-item" id="ollama-status">
+                            <i class="fas fa-circle"></i>
+                            <span>Ollama</span>
+                        </div>
+                        <div class="status-item" id="model-status">
+                            <i class="fas fa-brain"></i>
+                            <span>Gemma 3n</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Application -->
+        <div id="main-app" class="main-app hidden">
+            <!-- Header -->
+            <header class="header">
+                <div class="header-content">
+                    <div class="logo">
+                        <i class="fas fa-heartbeat"></i>
+                        <h1>RapidCare</h1>
+                    </div>
+                    <div class="user-info">
+                        <div class="welcome-message">
+                            <span id="welcome-text">Welcome, Paramedic</span>
+                        </div>
+                        <button id="logout-btn" class="logout-btn">
+                            <i class="fas fa-sign-out-alt"></i>
+                            Logout
+                        </button>
+                    </div>
+                    <div class="status-indicators">
+                        <div class="status-item" id="ollama-status-main">
+                            <i class="fas fa-circle"></i>
+                            <span>Ollama</span>
+                        </div>
+                        <div class="status-item" id="model-status-main">
+                            <i class="fas fa-brain"></i>
+                            <span>Gemma 3n</span>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Main Content -->
+            <main class="main-content">
+                <!-- System Messages -->
+                <div class="system-messages" id="system-messages">
+                    <div class="message system">
+                        <div class="message-content">
+                            <i class="fas fa-info-circle"></i>
+                            <span>System ready. Select an action to begin.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Grid -->
+                <div class="action-grid">
+                    <div class="action-card" data-action="video-analysis">
+                        <div class="action-icon">
+                            <i class="fas fa-video"></i>
+                        </div>
+                        <h3>Video Analysis</h3>
+                        <p>Analyze video footage for patient assessment and triage</p>
+                        <button class="action-btn">
+                            <i class="fas fa-play"></i>
+                            Start Analysis
+                        </button>
+                    </div>
+
+                    <div class="action-card" data-action="image-analysis">
+                        <div class="action-icon">
+                            <i class="fas fa-camera"></i>
+                        </div>
+                        <h3>Image Analysis</h3>
+                        <p>Analyze photos for patient condition assessment</p>
+                        <button class="action-btn">
+                            <i class="fas fa-upload"></i>
+                            Upload Image
+                        </button>
+                    </div>
+
+                    <div class="action-card" data-action="voice-input">
+                        <div class="action-icon">
+                            <i class="fas fa-microphone"></i>
+                        </div>
+                        <h3>Voice Input</h3>
+                        <p>Record voice notes for patient assessment</p>
+                        <button class="action-btn">
+                            <i class="fas fa-record-vinyl"></i>
+                            Start Recording
+                        </button>
+                    </div>
+
+                    <div class="action-card" data-action="create-patient">
+                        <div class="action-icon">
+                            <i class="fas fa-user-plus"></i>
+                        </div>
+                        <h3>Create Patient</h3>
+                        <p>Manually create a new patient record</p>
+                        <button class="action-btn">
+                            <i class="fas fa-plus"></i>
+                            Add Patient
+                        </button>
+                    </div>
+
+                    <div class="action-card" data-action="view-patients">
+                        <div class="action-icon">
+                            <i class="fas fa-list"></i>
+                        </div>
+                        <h3>View Patients</h3>
+                        <p>View and manage all patient records</p>
+                        <button class="action-btn">
+                            <i class="fas fa-eye"></i>
+                            View All
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Patient List -->
+                <div class="patient-section">
+                    <h3>Recent Patients</h3>
+                    <div id="patients-list" class="patients-list"></div>
+                </div>
+            </main>
+        </div>
+
+        <!-- Modals -->
+        
+        <!-- Patient Modal -->
+        <div id="patient-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Add New Patient</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="patient-form">
+                        <div class="form-group">
+                            <label for="patient-rfid">RFID Tag:</label>
+                            <input type="text" id="patient-rfid" readonly placeholder="Auto-generated RFID">
+                        </div>
+                        <div class="form-group">
+                            <label for="patient-name">Patient Name:</label>
+                            <input type="text" id="patient-name" placeholder="Enter name or 'Unknown' for unconscious patients">
+                        </div>
+                        <div class="form-group">
+                            <label for="patient-age">Age (if known):</label>
+                            <input type="number" id="patient-age" placeholder="Age in years">
+                        </div>
+                        <div class="form-group">
+                            <label for="triage-level">Triage Level:</label>
+                            <select id="triage-level" required>
+                                <option value="Red">Red - Immediate</option>
+                                <option value="Yellow">Yellow - Delayed</option>
+                                <option value="Green">Green - Minor</option>
+                                <option value="Black">Black - Deceased</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="patient-location">Location:</label>
+                            <input type="text" id="patient-location" placeholder="Zone A, Triage Tent, etc.">
+                        </div>
+                        <div class="form-group">
+                            <label for="patient-notes">Medical Notes:</label>
+                            <div class="notes-input-container">
+                                <textarea id="patient-notes" placeholder="Injuries, symptoms, treatment provided, etc."></textarea>
+                                <button id="notes-voice-btn" class="notes-voice-btn" title="Voice Dictation">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary">Add Patient</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Media Upload Modal -->
+        <div id="media-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="media-modal-title">Upload Media</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="media-tabs">
+                        <button class="tab-btn active" data-tab="camera">Camera</button>
+                        <button class="tab-btn" data-tab="upload">Upload File</button>
+                    </div>
+                    
+                    <div class="tab-content">
+                        <!-- Camera Tab -->
+                        <div class="tab-pane active" id="camera-tab">
+                            <div class="camera-container">
+                                <video id="camera-preview" autoplay muted playsinline></video>
+                                <canvas id="capture-canvas" style="display: none;"></canvas>
+                                <div class="camera-controls">
+                                    <button id="capture-btn" class="btn-primary">
+                                        <i class="fas fa-camera"></i>
+                                        Capture
+                                    </button>
+                                    <button id="record-btn" class="btn-primary">
+                                        <i class="fas fa-video"></i>
+                                        Start Recording
+                                    </button>
+                                    <button id="stop-record-btn" class="btn-secondary" style="display: none;">
+                                        <i class="fas fa-stop"></i>
+                                        Stop Recording
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <!-- Upload Tab -->
+                        <div class="tab-pane" id="upload-tab">
+                            <div class="upload-container">
+                                <div class="upload-area" id="upload-area">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <p>Drag & drop files here or click to browse</p>
+                                    <input type="file" id="file-input" accept="image/*,video/*" multiple style="display: none;">
+                                </div>
+                                <div class="file-list" id="file-list"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="media-actions">
+                        <button id="analyze-media-btn" class="btn-primary">
+                            <i class="fas fa-brain"></i>
+                            Analyze Media
+                        </button>
+                        <button id="close-media-btn" class="btn-secondary">
+                            <i class="fas fa-times"></i>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Triage Result Modal -->
+        <div id="triage-modal" class="modal">
+            <div class="modal-content triage-modal-content">
+                <div class="modal-header">
+                    <h3>Triage Assessment Result</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body" id="triage-modal-body">
+                    <!-- Triage result will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- SOAP Notes Modal -->
+        <div id="soap-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>SOAP Notes</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="soap-notes-list">
+                        <!-- SOAP notes will be loaded here -->
+                    </div>
+                    <form id="soap-form">
+                        <input type="hidden" id="soap-patient-id">
+                        <div class="form-group">
+                            <label for="soap-subjective">Subjective:</label>
+                            <div class="notes-input-container">
+                                <textarea id="soap-subjective" placeholder="Patient's chief complaint and history..." required></textarea>
+                                <button id="soap-subjective-voice-btn" class="notes-voice-btn" title="Voice Dictation">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="soap-objective">Objective:</label>
+                            <div class="notes-input-container">
+                                <textarea id="soap-objective" placeholder="Physical examination findings, vital signs..." required></textarea>
+                                <button id="soap-objective-voice-btn" class="notes-voice-btn" title="Voice Dictation">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="soap-assessment">Assessment:</label>
+                            <div class="notes-input-container">
+                                <textarea id="soap-assessment" placeholder="Diagnosis and differential diagnoses..." required></textarea>
+                                <button id="soap-assessment-voice-btn" class="notes-voice-btn" title="Voice Dictation">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label for="soap-plan">Plan:</label>
+                            <div class="notes-input-container">
+                                <textarea id="soap-plan" placeholder="Treatment plan, medications, follow-up..." required></textarea>
+                                <button id="soap-plan-voice-btn" class="notes-voice-btn" title="Voice Dictation">
+                                    <i class="fas fa-microphone"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary">Save SOAP Note</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Missing Person Modal -->
+        <div id="missing-person-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Submit Missing Person Report</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <form id="missing-person-form">
+                        <div class="form-group">
+                            <label for="missing-person-name">Name:</label>
+                            <input type="text" id="missing-person-name" placeholder="Full name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="missing-person-age">Age:</label>
+                            <input type="number" id="missing-person-age" placeholder="Age in years">
+                        </div>
+                        <div class="form-group">
+                            <label for="missing-person-description">Description:</label>
+                            <textarea id="missing-person-description" placeholder="Physical description, clothing, distinctive features..." required></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="missing-person-contact">Contact Information:</label>
+                            <input type="text" id="missing-person-contact" placeholder="Phone number, email, or other contact">
+                        </div>
+                        <div class="form-group">
+                            <label for="missing-person-photo">Photo:</label>
+                            <div class="photo-upload-area" id="photo-upload-area">
+                                <i class="fas fa-camera"></i>
+                                <p>Click to upload photo or take picture</p>
+                                <input type="file" id="missing-person-photo-input" accept="image/*" style="display: none;">
+                            </div>
+                            <div id="photo-preview" class="photo-preview" style="display: none;">
+                                <img id="photo-preview-img" src="" alt="Photo preview">
+                                <button type="button" id="remove-photo-btn" class="btn-secondary">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-primary">Submit Report</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Find Match Modal -->
+        <div id="find-match-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Find Missing Person Match</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="search-photo">Upload Photo to Search:</label>
+                        <div class="photo-upload-area" id="search-photo-upload-area">
+                            <i class="fas fa-search"></i>
+                            <p>Click to upload photo for matching</p>
+                            <input type="file" id="search-photo-input" accept="image/*" style="display: none;">
+                        </div>
+                        <div id="search-photo-preview" class="photo-preview" style="display: none;">
+                            <img id="search-photo-preview-img" src="" alt="Search photo preview">
+                            <button type="button" id="remove-search-photo-btn" class="btn-secondary">
+                                <i class="fas fa-times"></i> Remove
+                            </button>
+                        </div>
+                    </div>
+                    <button id="search-match-btn" class="btn-primary" disabled>
+                        <i class="fas fa-search"></i> Search for Matches
+                    </button>
+                    
+                    <div id="match-results" class="match-results" style="display: none;">
+                        <h4>Potential Matches</h4>
+                        <div id="match-list"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Missing Persons List Modal -->
+        <div id="missing-persons-list-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Missing Persons Database</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div id="missing-persons-list" class="missing-persons-list">
+                        <!-- Missing persons will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Offline Indicator -->
+        <div id="offline-indicator" class="offline-indicator hidden">
+            <i class="fas fa-wifi-slash"></i>
+            <span>Working Offline</span>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/static/js/app.js?v=3"></script>
+    <script src="/static/js/sw.js"></script>
+</body>
+</html> 
