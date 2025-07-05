@@ -470,6 +470,11 @@ class RapidCareApp {
 
     async startCamera() {
         try {
+            // Check if MediaDevices API is available
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('MediaDevices API not supported in this browser');
+            }
+
             this.stream = await navigator.mediaDevices.getUserMedia({ 
                 video: true, 
                 audio: false 
@@ -481,7 +486,7 @@ class RapidCareApp {
             this.addSystemMessage('Camera started. Ready to capture or record.');
         } catch (error) {
             console.error('Error accessing camera:', error);
-            this.addSystemMessage('Error: Could not access camera. Please check permissions.');
+            this.addSystemMessage('Error: Could not access camera - ' + error.message);
         }
     }
 
@@ -1210,6 +1215,14 @@ class RapidCareApp {
     }
 
     startGemmaRecordingForField(field, prompt) {
+        // Check if MediaDevices API is available
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            console.error('MediaDevices API not supported');
+            this.addSystemMessage('Error: Media recording not supported in this browser');
+            this.stopVoiceInput();
+            return;
+        }
+
         // Use MediaRecorder API to record audio
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
@@ -1232,7 +1245,7 @@ class RapidCareApp {
             })
             .catch(error => {
                 console.error('Error accessing microphone:', error);
-                this.addSystemMessage('Error: Could not access microphone');
+                this.addSystemMessage('Error: Could not access microphone - ' + error.message);
                 this.stopVoiceInput();
             });
     }

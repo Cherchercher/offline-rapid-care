@@ -27,16 +27,16 @@ class ModelManager:
         self.direct_model = None
         self.direct_processor = None
         self.direct_pipeline = None
+        self._model_loaded = False
         
         # Auto-detect mode if not specified
         if mode == "auto":
             self.mode = self._detect_best_mode()
         
-        # Initialize based on mode
-        if self.mode == "direct":
-            self._load_direct_model()
-        elif self.mode == "ollama":
+        # Initialize based on mode (but don't load model yet)
+        if self.mode == "ollama":
             self._check_ollama_connection()
+        # For direct mode, we'll load the model lazily when first needed
     
     def _detect_best_mode(self) -> str:
         """Auto-detect the best mode based on environment"""
@@ -69,22 +69,49 @@ class ModelManager:
                 print("Please run download_gemma_local.py first")
                 raise FileNotFoundError(f"Local model not found at {local_model_path}")
             
-            # Load processor and model from local directory
+            # Load processor and model from local directory with better memory management
             self.direct_processor = AutoProcessor.from_pretrained(
                 local_model_path, 
-                device_map="cpu",
                 trust_remote_code=True
             )
             
-            self.direct_model = AutoModelForImageTextToText.from_pretrained(
-                local_model_path, 
-                torch_dtype=torch.float32, 
-                device_map="cpu",
-                trust_remote_code=True,
-                low_cpu_mem_usage=True
-            )
-            
-            print("✅ Local model loaded successfully on CPU")
+            # Try different loading strategies
+            try:
+                # Strategy 1: CPU with half precision
+                print("🔄 Trying CPU with half precision...")
+                self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                    local_model_path, 
+                    torch_dtype=torch.float16, 
+                    device_map="cpu",
+                    trust_remote_code=True,
+                    low_cpu_mem_usage=True
+                )
+                print("✅ Model loaded with half precision on CPU")
+            except Exception as e1:
+                print(f"⚠️  Half precision failed: {e1}")
+                try:
+                    # Strategy 2: CPU with full precision
+                    print("🔄 Trying CPU with full precision...")
+                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                        local_model_path, 
+                        torch_dtype=torch.float32, 
+                        device_map="cpu",
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True
+                    )
+                    print("✅ Model loaded with full precision on CPU")
+                except Exception as e2:
+                    print(f"⚠️  Full precision failed: {e2}")
+                    # Strategy 3: Auto device mapping
+                    print("🔄 Trying auto device mapping...")
+                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                        local_model_path, 
+                        torch_dtype="auto", 
+                        device_map="auto",
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True
+                    )
+                    print("✅ Model loaded with auto device mapping")
             
         except Exception as e:
             print(f"❌ Failed to load local model: {e}")
@@ -286,6 +313,12 @@ class ModelManager:
     def _chat_direct(self, messages: List[Dict], images: Optional[List[np.ndarray]] = None) -> Dict:
         """Chat using direct model loading"""
         try:
+            # Load model lazily if not already loaded
+            if not self._model_loaded:
+                print("🔄 Loading model on first request...")
+                self._load_direct_model()
+                self._model_loaded = True
+            
             if not self.direct_model or not self.direct_processor:
                 raise Exception("Direct model not loaded")
             
