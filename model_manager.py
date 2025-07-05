@@ -87,6 +87,7 @@ class ModelManager:
                     low_cpu_mem_usage=True
                 )
                 print("✅ Model loaded with half precision on CPU")
+                print(f"🔊 Model dtype: {next(self.direct_model.parameters()).dtype}")
             except Exception as e1:
                 print(f"⚠️  Half precision failed: {e1}")
                 try:
@@ -100,6 +101,7 @@ class ModelManager:
                         low_cpu_mem_usage=True
                     )
                     print("✅ Model loaded with full precision on CPU")
+                    print(f"🔊 Model dtype: {next(self.direct_model.parameters()).dtype}")
                 except Exception as e2:
                     print(f"⚠️  Full precision failed: {e2}")
                     # Strategy 3: Auto device mapping
@@ -112,6 +114,7 @@ class ModelManager:
                         low_cpu_mem_usage=True
                     )
                     print("✅ Model loaded with auto device mapping")
+                    print(f"🔊 Model dtype: {next(self.direct_model.parameters()).dtype}")
             
         except Exception as e:
             print(f"❌ Failed to load local model: {e}")
@@ -322,6 +325,10 @@ class ModelManager:
             if not self.direct_model or not self.direct_processor:
                 raise Exception("Direct model not loaded")
             
+            print(f"🔊 Direct model chat request:")
+            print(f"   Messages: {json.dumps(messages, indent=2)}")
+            print(f"   Has images: {images is not None}")
+            
             # Apply chat template
             input_ids = self.direct_processor.apply_chat_template(
                 messages,
@@ -331,8 +338,10 @@ class ModelManager:
                 return_tensors="pt"
             )
             
-            # Move to CPU with float32
-            input_ids = input_ids.to("cpu", dtype=torch.float32)
+            # Move to CPU with the same dtype as the model
+            model_dtype = next(self.direct_model.parameters()).dtype
+            input_ids = input_ids.to("cpu", dtype=model_dtype)
+            print(f"🔊 Using model dtype: {model_dtype}")
             
             # Generate response
             outputs = self.direct_model.generate(
@@ -507,6 +516,16 @@ class ModelManager:
             print(f"   File: {audio_file_path}")
             print(f"   Filename: {filename}")
             print(f"   Audio URL: {audio_url}")
+            print(f"   File exists: {os.path.exists(audio_file_path)}")
+            print(f"   File size: {os.path.getsize(audio_file_path) if os.path.exists(audio_file_path) else 'N/A'} bytes")
+            
+            # Check if serve_uploads is running
+            try:
+                import requests
+                response = requests.get("http://0.0.0.0:11435/", timeout=2)
+                print(f"   Serve uploads status: {response.status_code}")
+            except Exception as e:
+                print(f"   Serve uploads not accessible: {e}")
             
             # Use the URL-based transcription method
             return self.transcribe_audio_with_url(audio_url, prompt)

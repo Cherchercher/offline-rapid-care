@@ -909,9 +909,28 @@ def transcribe_audio():
             return jsonify({'error': 'No audio file selected'}), 400
         
         # Save uploaded audio
+        print(f"🔊 Audio upload debug:")
+        print(f"   Original filename: {file.filename}")
+        print(f"   File content type: {file.content_type}")
+        print(f"   File size: {len(file.read())} bytes")
+        file.seek(0)  # Reset file pointer after reading
+        
         filename = f"audio_{uuid.uuid4()}{os.path.splitext(file.filename)[1]}"
         audio_path = os.path.join('uploads', filename)
         file.save(audio_path)
+        print(f"   Saved as: {audio_path}")
+        
+        # Convert to WAV for better compatibility
+        try:
+            from convert_audio import convert_to_wav
+            wav_path = convert_to_wav(audio_path)
+            if wav_path:
+                audio_path = wav_path
+                print(f"   Converted to WAV: {audio_path}")
+            else:
+                print(f"   Conversion failed, using original: {audio_path}")
+        except Exception as e:
+            print(f"   Conversion error: {e}, using original: {audio_path}")
         
         # Transcribe using Gemma 3n
         result = model_manager.transcribe_audio_file(audio_path, prompt)
@@ -940,8 +959,16 @@ if __name__ == '__main__':
     # For development, you can use a self-signed certificate
     # In production, use a proper SSL certificate
     try:
+        print("Starting Flask app on HTTPS")
+        print("Access via: https://54.202.229.249:5050/")
+        print("Note: You may see a security warning - click 'Advanced' and 'Proceed'")
         app.run(debug=True, host='0.0.0.0', port=5050, ssl_context='adhoc')
-    except ImportError:
-        print("SSL not available, running without HTTPS")
+    except ImportError as e:
+        print(f"SSL not available: {e}")
         print("Note: MediaDevices API requires HTTPS in most browsers")
+        print("Access via: http://54.202.229.249:5050/")
+        app.run(debug=True, host='0.0.0.0', port=5050)
+    except Exception as e:
+        print(f"Error starting HTTPS: {e}")
+        print("Falling back to HTTP")
         app.run(debug=True, host='0.0.0.0', port=5050) 

@@ -1227,16 +1227,31 @@ class RapidCareApp {
         navigator.mediaDevices.getUserMedia({ audio: true })
             .then(stream => {
                 this.stream = stream;
-                this.mediaRecorder = new MediaRecorder(stream);
+                // Try different audio formats in order of preference
+                let mimeType = '';
+                if (MediaRecorder.isTypeSupported('audio/webm')) {
+                    mimeType = 'audio/webm';
+                } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
+                    mimeType = 'audio/ogg';
+                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+                    mimeType = 'audio/mp4';
+                } else {
+                    console.warn('No specific format supported, using default');
+                }
+                console.log('Using audio format:', mimeType || 'default');
+                this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
                 this.recordedChunks = [];
 
                 this.mediaRecorder.ondataavailable = (event) => {
+                    console.log('🔊 Data available:', event.data.size, 'bytes');
                     if (event.data.size > 0) {
                         this.recordedChunks.push(event.data);
+                        console.log('🔊 Total chunks:', this.recordedChunks.length);
                     }
                 };
 
                 this.mediaRecorder.onstop = () => {
+                    console.log('🔊 MediaRecorder onstop triggered');
                     this.processGemmaRecordingForField(field, prompt);
                 };
 
@@ -1251,12 +1266,36 @@ class RapidCareApp {
     }
 
     async processGemmaRecordingForField(field, prompt) {
+        console.log('🔊 processGemmaRecordingForField called');
+        console.log('   Field:', field);
+        console.log('   Prompt:', prompt);
+        console.log('   Media recorder:', this.mediaRecorder);
+        console.log('   Recorded chunks:', this.recordedChunks.length);
+        
         try {
-            const blob = new Blob(this.recordedChunks, { type: 'audio/wav' });
+            // Get the actual MIME type from the recorder
+            const mimeType = this.mediaRecorder.mimeType;
+            console.log('Recording MIME type:', mimeType);
+            
+            // Determine file extension based on MIME type
+            let extension = '.webm'; // default
+            if (mimeType.includes('webm')) extension = '.webm';
+            else if (mimeType.includes('ogg')) extension = '.ogg';
+            else if (mimeType.includes('mp4')) extension = '.m4a';
+            else if (mimeType.includes('wav')) extension = '.wav';
+            
+            const blob = new Blob(this.recordedChunks, { type: mimeType });
             const formData = new FormData();
-            formData.append('file', blob, 'recording.wav');
+            const filename = `recording${extension}`;
+            formData.append('file', blob, filename);
             formData.append('prompt', prompt);
             formData.append('role', this.currentRole);
+            
+            console.log('🔊 Audio upload details:');
+            console.log('   MIME type:', mimeType);
+            console.log('   Extension:', extension);
+            console.log('   Filename:', filename);
+            console.log('   Blob size:', blob.size, 'bytes');
 
             this.addSystemMessage('Transcribing with Gemma 3n...');
 
