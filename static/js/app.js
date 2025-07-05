@@ -8,6 +8,8 @@ class RapidCareApp {
         this.stream = null;
         this.recognition = null;
         this.isOnline = navigator.onLine;
+        this.currentVoiceMethod = null;
+        this.currentVoiceField = null;
         
         this.init();
     }
@@ -17,6 +19,22 @@ class RapidCareApp {
         this.checkOnlineStatus();
         this.updateStatusIndicators();
         this.loadPatients();
+        
+        // Initialize system messages as collapsed
+        const systemMessages = document.getElementById('system-messages');
+        systemMessages.classList.add('collapsed');
+        this.updateSystemMessagesCount();
+        
+        // Check if user is already logged in
+        const storedRole = localStorage.getItem('rapidcare_role');
+        if (storedRole) {
+            this.currentRole = storedRole;
+            document.getElementById('welcome-text').textContent = `Welcome, ${this.getRoleDisplayName(storedRole)}`;
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-app').classList.remove('hidden');
+            this.updateActionCardsForRole(storedRole);
+            this.addSystemMessage(`Welcome back, ${this.getRoleDisplayName(storedRole)}. System ready for emergency response.`);
+        }
         
         // Start status polling
         setInterval(() => this.updateStatusIndicators(), 30000);
@@ -29,6 +47,31 @@ class RapidCareApp {
         });
 
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
+
+        // Voice input dropdown
+        const voiceInputBtn = document.getElementById('voice-input-btn');
+        const voiceDropdownMenu = document.getElementById('voice-dropdown-menu');
+        
+        voiceInputBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            voiceDropdownMenu.classList.toggle('show');
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.voice-input-dropdown')) {
+                voiceDropdownMenu.classList.remove('show');
+            }
+        });
+
+        // Voice option selection
+        document.querySelectorAll('.voice-option').forEach(option => {
+            option.addEventListener('click', (e) => {
+                const method = option.dataset.method;
+                this.selectVoiceMethod(method);
+                voiceDropdownMenu.classList.remove('show');
+            });
+        });
 
         // Action cards
         document.querySelectorAll('.action-card').forEach(card => {
@@ -75,7 +118,34 @@ class RapidCareApp {
         // Voice input for notes
         document.getElementById('notes-voice-btn').addEventListener('click', (e) => {
             e.preventDefault();
-            this.startVoiceInput();
+            this.startVoiceInput('patient-notes');
+        });
+
+        // Patient section click
+        document.getElementById('patient-section').addEventListener('click', (e) => {
+            // Don't trigger if clicking on a patient card (for doctors)
+            if (e.target.closest('.patient-card')) {
+                return;
+            }
+            this.showPatientsList();
+        });
+
+        // System messages toggle
+        document.getElementById('system-messages-header').addEventListener('click', (e) => {
+            if (!e.target.closest('.clear-messages-btn')) {
+                this.toggleSystemMessages();
+            }
+        });
+
+        // Clear messages button
+        document.getElementById('clear-messages-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.clearSystemMessages();
+        });
+
+        // Stop recording button
+        document.getElementById('stop-recording-btn').addEventListener('click', () => {
+            this.stopRecording();
         });
 
         // SOAP notes voice input buttons
@@ -173,52 +243,28 @@ class RapidCareApp {
 
                 <div class="action-card" data-action="view-patients">
                     <div class="action-icon">
-                        <i class="fas fa-list"></i>
+                        <i class="fas fa-hospital-user"></i>
                     </div>
                     <h3>View Patients</h3>
-                    <p>View and manage all patient records</p>
+                    <p>View all patient records for matching</p>
                     <button class="action-btn">
-                        <i class="fas fa-eye"></i>
-                        View All
+                        <i class="fas fa-users"></i>
+                        View Patients
                     </button>
                 </div>
             `;
-        } else {
-            // Show standard actions for other roles
+        } else if (role === 'DOCTOR') {
+            // Show doctor-specific actions
             actionGrid.innerHTML = `
-                <div class="action-card" data-action="video-analysis">
+                <div class="action-card" data-action="view-patients">
                     <div class="action-icon">
-                        <i class="fas fa-video"></i>
+                        <i class="fas fa-stethoscope"></i>
                     </div>
-                    <h3>Video Analysis</h3>
-                    <p>Analyze video footage for patient assessment and triage</p>
+                    <h3>Patient List</h3>
+                    <p>View and manage all patient records with SOAP notes</p>
                     <button class="action-btn">
-                        <i class="fas fa-play"></i>
-                        Start Analysis
-                    </button>
-                </div>
-
-                <div class="action-card" data-action="image-analysis">
-                    <div class="action-icon">
-                        <i class="fas fa-camera"></i>
-                    </div>
-                    <h3>Image Analysis</h3>
-                    <p>Analyze photos for patient condition assessment</p>
-                    <button class="action-btn">
-                        <i class="fas fa-upload"></i>
-                        Upload Image
-                    </button>
-                </div>
-
-                <div class="action-card" data-action="voice-input">
-                    <div class="action-icon">
-                        <i class="fas fa-microphone"></i>
-                    </div>
-                    <h3>Voice Input</h3>
-                    <p>Record voice notes for patient assessment</p>
-                    <button class="action-btn">
-                        <i class="fas fa-record-vinyl"></i>
-                        Start Recording
+                        <i class="fas fa-users"></i>
+                        View Patients
                     </button>
                 </div>
 
@@ -227,7 +273,46 @@ class RapidCareApp {
                         <i class="fas fa-user-plus"></i>
                     </div>
                     <h3>Create Patient</h3>
-                    <p>Manually create a new patient record</p>
+                    <p>Add a new patient to the system</p>
+                    <button class="action-btn">
+                        <i class="fas fa-plus"></i>
+                        Add Patient
+                    </button>
+                </div>
+            `;
+        } else {
+            // Show paramedic/nurse actions
+            actionGrid.innerHTML = `
+                <div class="action-card" data-action="video-analysis">
+                    <div class="action-icon">
+                        <i class="fas fa-video"></i>
+                    </div>
+                    <h3>Video Analysis</h3>
+                    <p>Analyze video for triage assessment</p>
+                    <button class="action-btn">
+                        <i class="fas fa-play"></i>
+                        Analyze Video
+                    </button>
+                </div>
+
+                <div class="action-card" data-action="image-analysis">
+                    <div class="action-icon">
+                        <i class="fas fa-camera"></i>
+                    </div>
+                    <h3>Image Analysis</h3>
+                    <p>Analyze images for triage assessment</p>
+                    <button class="action-btn">
+                        <i class="fas fa-search"></i>
+                        Analyze Image
+                    </button>
+                </div>
+
+                <div class="action-card" data-action="create-patient">
+                    <div class="action-icon">
+                        <i class="fas fa-user-plus"></i>
+                    </div>
+                    <h3>Create Patient</h3>
+                    <p>Add a new patient to the system</p>
                     <button class="action-btn">
                         <i class="fas fa-plus"></i>
                         Add Patient
@@ -236,23 +321,25 @@ class RapidCareApp {
 
                 <div class="action-card" data-action="view-patients">
                     <div class="action-icon">
-                        <i class="fas fa-list"></i>
+                        <i class="fas fa-hospital-user"></i>
                     </div>
                     <h3>View Patients</h3>
-                    <p>View and manage all patient records</p>
+                    <p>View all patient records</p>
                     <button class="action-btn">
-                        <i class="fas fa-eye"></i>
-                        View All
+                        <i class="fas fa-users"></i>
+                        View Patients
                     </button>
                 </div>
             `;
         }
 
-        // Re-attach event listeners to new action cards
+        // Add event listeners to the new action cards
         document.querySelectorAll('.action-card').forEach(card => {
             const action = card.dataset.action;
             const btn = card.querySelector('.action-btn');
-            btn.addEventListener('click', (e) => this.handleActionClick(action, e));
+            if (btn) {
+                btn.addEventListener('click', (e) => this.handleActionClick(action, e));
+            }
         });
     }
 
@@ -287,6 +374,7 @@ class RapidCareApp {
 
     handleActionClick(action, event) {
         event.preventDefault();
+        console.log('Action clicked:', action);
 
         switch (action) {
             case 'video-analysis':
@@ -296,7 +384,8 @@ class RapidCareApp {
                 this.openMediaModal('Image Analysis', 'image');
                 break;
             case 'voice-input':
-                this.startVoiceInput();
+                console.log('Voice input action triggered');
+                this.openVoiceInputModal();
                 break;
             case 'create-patient':
                 this.openPatientModal();
@@ -440,15 +529,27 @@ class RapidCareApp {
     }
 
     stopRecording() {
+        if (this.recognition) {
+            this.recognition.stop();
+        }
         if (this.mediaRecorder && this.isRecording) {
             this.mediaRecorder.stop();
-            this.isRecording = false;
-
-            document.getElementById('record-btn').style.display = 'inline-block';
-            document.getElementById('stop-record-btn').style.display = 'none';
-
-            this.addSystemMessage('Recording stopped. Analyzing video...');
         }
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+        }
+        
+        this.isRecording = false;
+        document.getElementById('recording-status-text').textContent = 'Recording stopped';
+        
+        // Reset voice input button state
+        const voiceInputBtn = document.getElementById('voice-input-btn');
+        voiceInputBtn.classList.remove('recording');
+        voiceInputBtn.innerHTML = `
+            <i class="fas fa-microphone"></i>
+            <span>Voice Input</span>
+            <i class="fas fa-chevron-down"></i>
+        `;
     }
 
     handleFileDrop(event) {
@@ -867,8 +968,13 @@ class RapidCareApp {
             return priorityA - priorityB;
         });
 
-        container.innerHTML = sortedPatients.slice(0, 5).map(patient => `
-            <div class="patient-card ${patient.triage_level.toLowerCase()}">
+        // Show more patients for doctors, fewer for others
+        const maxPatients = this.currentRole === 'DOCTOR' ? 10 : 5;
+        const displayPatients = sortedPatients.slice(0, maxPatients);
+
+        container.innerHTML = displayPatients.map(patient => `
+            <div class="patient-card ${patient.triage_level.toLowerCase()}" 
+                 ${this.currentRole === 'DOCTOR' ? `onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')" style="cursor: pointer;"` : ''}>
                 <div class="patient-header">
                     <h4>${patient.name || 'Unknown'}</h4>
                     <span class="triage-badge ${patient.triage_level.toLowerCase()}">${patient.triage_level}</span>
@@ -881,7 +987,7 @@ class RapidCareApp {
                 </div>
                 <div class="patient-actions">
                     ${this.currentRole === 'DOCTOR' ? `
-                        <button class="btn-secondary" onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')">
+                        <button class="btn-secondary" onclick="event.stopPropagation(); app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')">
                             <i class="fas fa-stethoscope"></i>
                             SOAP Notes
                         </button>
@@ -889,6 +995,18 @@ class RapidCareApp {
                 </div>
             </div>
         `).join('');
+
+        // Add "View All" button if there are more patients
+        if (patients.length > maxPatients) {
+            container.innerHTML += `
+                <div class="view-all-patients">
+                    <button class="btn-primary" onclick="app.showPatientsList()">
+                        <i class="fas fa-list"></i>
+                        View All ${patients.length} Patients
+                    </button>
+                </div>
+            `;
+        }
     }
 
     async openSoapNotes(patientId, patientName) {
@@ -998,33 +1116,63 @@ class RapidCareApp {
     }
 
     startVoiceInput(field = 'patient-notes') {
-        if (!('webkitSpeechRecognition' in window)) {
-            this.addSystemMessage('Error: Speech recognition not supported');
+        // If no specific method is set, default to webkit
+        if (!this.currentVoiceMethod) {
+            this.currentVoiceMethod = 'webkit';
+        }
+        
+        this.currentVoiceField = field;
+        
+        // Get the specific mic button that was clicked
+        const micButton = document.getElementById(field === 'patient-notes' ? 'notes-voice-btn' : `${field}-voice-btn`);
+        
+        // Check if already recording
+        if (this.isRecording) {
+            // Stop recording
+            this.stopVoiceInput();
             return;
         }
+        
+        // Start recording
+        this.isRecording = true;
+        
+        // Update the mic button to show recording state
+        micButton.classList.add('recording');
+        micButton.innerHTML = '<i class="fas fa-stop"></i>';
+        
+        switch (this.currentVoiceMethod) {
+            case 'webkit':
+                this.startWebkitRecordingForField(field);
+                break;
+            case 'gemma':
+                this.startGemmaRecordingForField(field, 'Transcribe the following audio accurately:');
+                break;
+            case 'gemma-finetuned':
+                this.startGemmaRecordingForField(field, 'Transcribe the following medical audio with clinical terminology:');
+                break;
+        }
+    }
 
-        if (this.isRecording) {
+    startWebkitRecordingForField(field) {
+        if (!('webkitSpeechRecognition' in window)) {
+            this.addSystemMessage('Error: Speech recognition not supported');
             this.stopVoiceInput();
             return;
         }
 
         this.recognition = new webkitSpeechRecognition();
-        this.recognition.continuous = true;
+        this.recognition.continuous = false;
         this.recognition.interimResults = true;
         this.recognition.lang = 'en-US';
 
-        let finalTranscript = '';
         const textarea = document.getElementById(field);
-        const voiceBtn = document.getElementById(field === 'patient-notes' ? 'notes-voice-btn' : `${field}-voice-btn`);
 
         this.recognition.onstart = () => {
-            this.isRecording = true;
-            voiceBtn.classList.add('recording');
-            voiceBtn.innerHTML = '<i class="fas fa-stop"></i>';
-            this.addSystemMessage('Voice recording started. Speak now...');
+            this.addSystemMessage('Voice recording started. Click stop when finished.');
         };
 
         this.recognition.onresult = (event) => {
+            let finalTranscript = '';
             let interimTranscript = '';
 
             for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -1036,16 +1184,21 @@ class RapidCareApp {
                 }
             }
 
-            // Update textarea with current transcription
-            const currentText = textarea.value;
-            textarea.value = currentText + finalTranscript + interimTranscript;
-            textarea.focus();
+            // Update the textarea with the transcription
+            if (finalTranscript.trim()) {
+                const currentText = textarea.value;
+                const separator = currentText && !currentText.endsWith('.') && !currentText.endsWith(' ') ? '. ' : ' ';
+                textarea.value = currentText + separator + finalTranscript.trim();
+                textarea.focus();
+            }
         };
 
         this.recognition.onerror = (event) => {
             console.error('Speech recognition error:', event.error);
-            this.addSystemMessage(`Voice recognition error: ${event.error}`);
-            this.stopVoiceInput();
+            if (event.error !== 'no-speech') {
+                this.addSystemMessage(`Voice recognition error: ${event.error}`);
+                this.stopVoiceInput();
+            }
         };
 
         this.recognition.onend = () => {
@@ -1056,10 +1209,80 @@ class RapidCareApp {
         this.recognition.start();
     }
 
+    startGemmaRecordingForField(field, prompt) {
+        // Use MediaRecorder API to record audio
+        navigator.mediaDevices.getUserMedia({ audio: true })
+            .then(stream => {
+                this.stream = stream;
+                this.mediaRecorder = new MediaRecorder(stream);
+                this.recordedChunks = [];
+
+                this.mediaRecorder.ondataavailable = (event) => {
+                    if (event.data.size > 0) {
+                        this.recordedChunks.push(event.data);
+                    }
+                };
+
+                this.mediaRecorder.onstop = () => {
+                    this.processGemmaRecordingForField(field, prompt);
+                };
+
+                this.mediaRecorder.start();
+                this.addSystemMessage('Voice recording started. Click stop when finished.');
+            })
+            .catch(error => {
+                console.error('Error accessing microphone:', error);
+                this.addSystemMessage('Error: Could not access microphone');
+                this.stopVoiceInput();
+            });
+    }
+
+    async processGemmaRecordingForField(field, prompt) {
+        try {
+            const blob = new Blob(this.recordedChunks, { type: 'audio/wav' });
+            const formData = new FormData();
+            formData.append('file', blob, 'recording.wav');
+            formData.append('prompt', prompt);
+            formData.append('role', this.currentRole);
+
+            this.addSystemMessage('Transcribing with Gemma 3n...');
+
+            const response = await fetch('/api/transcribe-audio', {
+                method: 'POST',
+                body: formData
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                // Update the textarea with the transcription
+                const textarea = document.getElementById(field);
+                const currentText = textarea.value;
+                const separator = currentText && !currentText.endsWith('.') && !currentText.endsWith(' ') ? '. ' : ' ';
+                textarea.value = currentText + separator + data.transcription;
+                textarea.focus();
+                
+                this.addSystemMessage('Transcription completed successfully');
+            } else {
+                this.addSystemMessage('Error: Transcription failed - ' + data.error);
+            }
+        } catch (error) {
+            console.error('Error processing recording:', error);
+            this.addSystemMessage('Error: Failed to process recording');
+        }
+    }
+
     stopVoiceInput() {
         if (this.recognition) {
             this.recognition.stop();
         }
+        if (this.mediaRecorder && this.isRecording) {
+            this.mediaRecorder.stop();
+        }
+        if (this.stream) {
+            this.stream.getTracks().forEach(track => track.stop());
+        }
+        
         this.isRecording = false;
         
         // Reset all voice buttons
@@ -1081,11 +1304,103 @@ class RapidCareApp {
     }
 
     showPatientsList() {
-        this.loadPatients();
+        this.loadAllPatients();
+        this.showModal(document.getElementById('patients-list-modal'));
+    }
+
+    async loadAllPatients() {
+        try {
+            const response = await fetch('/api/patients');
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displayAllPatients(data.patients);
+            }
+        } catch (error) {
+            console.error('Error loading all patients:', error);
+        }
+    }
+
+    displayAllPatients(patients) {
+        const container = document.getElementById('all-patients-list');
+        const countSpan = document.getElementById('patients-count');
+        
+        if (patients.length === 0) {
+            container.innerHTML = '<p class="no-patients">No patients recorded yet</p>';
+            countSpan.textContent = '0 patients';
+            return;
+        }
+
+        // Sort patients by triage priority: Red > Yellow > Green > Black
+        const triagePriority = { 'Red': 1, 'Yellow': 2, 'Green': 3, 'Black': 4 };
+        const sortedPatients = patients.sort((a, b) => {
+            const priorityA = triagePriority[a.triage_level] || 5;
+            const priorityB = triagePriority[b.triage_level] || 5;
+            return priorityA - priorityB;
+        });
+
+        countSpan.textContent = `${patients.length} patient${patients.length !== 1 ? 's' : ''}`;
+
+        container.innerHTML = sortedPatients.map(patient => `
+            <div class="patient-card ${patient.triage_level.toLowerCase()}" data-triage="${patient.triage_level}"
+                 ${this.currentRole === 'DOCTOR' ? `onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')" style="cursor: pointer;"` : ''}>
+                <div class="patient-header">
+                    <h4>${patient.name || 'Unknown'}</h4>
+                    <span class="triage-badge ${patient.triage_level.toLowerCase()}">${patient.triage_level}</span>
+                </div>
+                <div class="patient-details">
+                    <p><strong>RFID:</strong> ${patient.rfid || 'N/A'}</p>
+                    <p><strong>Location:</strong> ${patient.location || 'Unknown'}</p>
+                    <p><strong>Added:</strong> ${new Date(patient.created_at).toLocaleString()}</p>
+                    ${patient.age ? `<p><strong>Age:</strong> ${patient.age}</p>` : ''}
+                    ${patient.notes ? `<p><strong>Notes:</strong> ${patient.notes.substring(0, 100)}${patient.notes.length > 100 ? '...' : ''}</p>` : ''}
+                </div>
+                <div class="patient-actions">
+                    ${this.currentRole === 'DOCTOR' ? `
+                        <button class="btn-secondary" onclick="event.stopPropagation(); app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')">
+                            <i class="fas fa-stethoscope"></i>
+                            SOAP Notes
+                        </button>
+                    ` : ''}
+                </div>
+            </div>
+        `).join('');
+
+        // Add filter functionality
+        this.setupPatientFilter();
+    }
+
+    setupPatientFilter() {
+        const filterSelect = document.getElementById('triage-filter');
+        const patientCards = document.querySelectorAll('#all-patients-list .patient-card');
+        
+        filterSelect.addEventListener('change', (e) => {
+            const selectedTriage = e.target.value;
+            
+            patientCards.forEach(card => {
+                const cardTriage = card.dataset.triage;
+                if (!selectedTriage || cardTriage === selectedTriage) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        });
+    }
+
+    toggleSystemMessages() {
+        const systemMessages = document.getElementById('system-messages');
+        systemMessages.classList.toggle('collapsed');
+    }
+
+    clearSystemMessages() {
+        const content = document.getElementById('system-messages-content');
+        content.innerHTML = '';
+        this.updateSystemMessagesCount();
     }
 
     addSystemMessage(message) {
-        const container = document.getElementById('system-messages');
+        const content = document.getElementById('system-messages-content');
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message system';
         messageDiv.innerHTML = `
@@ -1094,17 +1409,25 @@ class RapidCareApp {
                 <span>${message}</span>
             </div>
         `;
+        content.appendChild(messageDiv);
+        this.updateSystemMessagesCount();
         
-        container.appendChild(messageDiv);
-        
-        // Scroll to bottom
-        container.scrollTop = container.scrollHeight;
-        
-        // Auto-remove old messages (keep last 10)
-        const messages = container.querySelectorAll('.message');
-        if (messages.length > 10) {
-            messages[0].remove();
+        // Auto-collapse after 5 seconds if it's a welcome message
+        if (message.includes('Welcome') || message.includes('System ready')) {
+            setTimeout(() => {
+                const systemMessages = document.getElementById('system-messages');
+                if (!systemMessages.classList.contains('collapsed')) {
+                    systemMessages.classList.add('collapsed');
+                }
+            }, 5000);
         }
+    }
+
+    updateSystemMessagesCount() {
+        const content = document.getElementById('system-messages-content');
+        const count = content.children.length;
+        const countSpan = document.getElementById('system-messages-count');
+        countSpan.textContent = `${count} message${count !== 1 ? 's' : ''}`;
     }
 
     async updateStatusIndicators() {
@@ -1152,6 +1475,45 @@ class RapidCareApp {
         } else {
             indicator.classList.add('hidden');
         }
+    }
+
+    openVoiceInputModal() {
+        console.log('Opening voice input modal...');
+        const modal = document.getElementById('voice-input-modal');
+        if (modal) {
+            console.log('Modal found, showing...');
+            this.showModal(modal);
+            // Reset the modal state
+            document.querySelector('.voice-options').style.display = 'grid';
+            document.getElementById('voice-recording-section').style.display = 'none';
+            document.getElementById('transcription-text').textContent = '';
+        } else {
+            console.error('Voice input modal not found!');
+            this.addSystemMessage('Error: Voice input modal not found');
+        }
+    }
+
+    selectVoiceMethod(method) {
+        console.log('Selecting voice input method:', method);
+        
+        // Store the selected method
+        this.currentVoiceMethod = method;
+        
+        // Update the voice input button to show the selected method
+        const voiceInputBtn = document.getElementById('voice-input-btn');
+        const methodNames = {
+            'webkit': 'Browser Speech',
+            'gemma': 'Gemma 3n AI',
+            'gemma-finetuned': 'Gemma Fine-tuned'
+        };
+        
+        voiceInputBtn.innerHTML = `
+            <i class="fas fa-microphone"></i>
+            <span>${methodNames[method] || 'Voice Input'}</span>
+            <i class="fas fa-chevron-down"></i>
+        `;
+        
+        this.addSystemMessage(`Voice input method set to: ${methodNames[method]}`);
     }
 }
 

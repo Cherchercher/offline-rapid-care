@@ -211,30 +211,53 @@ generate_icons() {
 start_ollama() {
     print_status "Starting Ollama service..."
     if ! pgrep -x "ollama" > /dev/null; then
-        # Start Ollama in background
-        ollama serve > /dev/null 2>&1 &
-        OLLAMA_PID=$!
+        print_warning "Ollama not running. Please start it manually in a separate terminal:"
+        print_warning "  ollama serve"
+        print_warning "Then press Enter to continue..."
+        read -r
         
         # Wait for Ollama to start
         print_status "Waiting for Ollama to start..."
         for i in {1..10}; do
             if curl -s http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
-                print_success "Ollama service started (PID: $OLLAMA_PID)"
+                print_success "Ollama service detected"
                 return 0
             fi
             sleep 1
         done
-        print_error "Failed to start Ollama service"
+        print_error "Failed to detect Ollama service. Make sure it's running on http://127.0.0.1:11434"
         exit 1
     else
         print_success "Ollama service already running"
     fi
 }
 
+# Start uploads server
+start_uploads_server() {
+    print_status "Starting uploads server for Ollama access..."
+    print_success "Uploads server will be available at: http://localhost:11435"
+    
+    # Start uploads server in background
+    $PYTHON_CMD serve_uploads.py > /dev/null 2>&1 &
+    UPLOADS_SERVER_PID=$!
+    
+    # Wait a moment for server to start
+    sleep 2
+    
+    # Test if server is running
+    if curl -s http://localhost:11435 > /dev/null 2>&1; then
+        print_success "Uploads server started (PID: $UPLOADS_SERVER_PID)"
+    else
+        print_warning "Uploads server may take a moment to start"
+    fi
+}
+
+
+
 # Start Flask application
 start_flask() {
     print_status "Starting RapidCare application..."
-    print_success "Application will be available at: http://localhost:5000"
+    print_success "Application will be available at: http://localhost:5050"
     print_success "Press Ctrl+C to stop the application"
     echo ""
     
@@ -249,11 +272,8 @@ start_flask() {
 # Cleanup function
 cleanup() {
     print_status "Shutting down..."
-    if [ ! -z "$OLLAMA_PID" ]; then
-        kill $OLLAMA_PID 2>/dev/null || true
-        print_success "Ollama service stopped"
-    fi
     print_success "RapidCare shutdown complete"
+    print_warning "Remember to stop Ollama manually if needed: pkill ollama"
     exit 0
 }
 

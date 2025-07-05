@@ -8,6 +8,7 @@ import numpy as np
 from PIL import Image
 import base64
 import io
+from urllib.parse import urljoin
 
 class ModelManager:
     """Manages both direct model loading and Ollama API modes"""
@@ -136,19 +137,19 @@ class ModelManager:
             return self._chat_direct(messages, images)
     
     def _chat_ollama(self, messages: List[Dict], images: Optional[List[np.ndarray]] = None) -> Dict:
-        """Chat using Ollama API with proper image handling for Gemma 3n"""
+        """Chat using Ollama API with proper image and audio handling for Gemma 3n"""
         try:
             # Prepare messages for Ollama
             ollama_messages = []
             
             for msg in messages:
                 if msg['role'] == 'user':
-                    # Check if message contains image URLs or base64 images
-                    has_images = False
+                    # Check if message contains image URLs, audio URLs, or base64 content
+                    has_multimodal = False
                     content_parts = []
                     
                     if isinstance(msg['content'], list):
-                        # Handle multimodal content with image URLs
+                        # Handle multimodal content with image/audio URLs
                         for item in msg['content']:
                             if isinstance(item, dict):
                                 if item.get('type') == 'image' and item.get('url'):
@@ -157,7 +158,14 @@ class ModelManager:
                                         "type": "image",
                                         "url": item['url']
                                     })
-                                    has_images = True
+                                    has_multimodal = True
+                                elif item.get('type') == 'audio' and item.get('audio'):
+                                    # Use audio URL directly
+                                    content_parts.append({
+                                        "type": "audio",
+                                        "audio": item['audio']
+                                    })
+                                    has_multimodal = True
                                 elif item.get('type') == 'text':
                                     content_parts.append(item)
                     elif images:
@@ -171,7 +179,7 @@ class ModelManager:
                                         "type": "image",
                                         "url": f"data:image/png;base64,{image_b64}"
                                     })
-                                    has_images = True
+                                    has_multimodal = True
                                 except Exception as e:
                                     print(f"Warning: Failed to process image {i}: {e}")
                         
@@ -185,7 +193,7 @@ class ModelManager:
                                 elif isinstance(item, str):
                                     content_parts.append({"type": "text", "text": item})
                     
-                    if has_images:
+                    if has_multimodal:
                         # Stringify the content for Ollama API
                         content_string = json.dumps(content_parts)
                         
@@ -216,7 +224,14 @@ class ModelManager:
                     else:
                         ollama_messages.append(msg)
             
-            # Call Ollama API with increased timeout
+            # Call Ollama API with increased timeout for audio processing
+            # Audio transcription can take much longer than text processing
+            timeout_value = 600  # 10 minutes for audio processing
+            if any('audio' in str(msg).lower() for msg in ollama_messages):
+                timeout_value = 600  # 10 minutes for audio
+            else:
+                timeout_value = 120  # 2 minutes for text
+            
             response = requests.post(
                 f"{self.ollama_url}/api/chat",
                 json={
@@ -224,7 +239,7 @@ class ModelManager:
                     "messages": ollama_messages,
                     "stream": False
                 },
-                timeout=120  # Increased timeout to 2 minutes
+                timeout=timeout_value
             )
             
             if response.status_code == 200:
@@ -246,7 +261,7 @@ class ModelManager:
         except requests.exceptions.Timeout:
             return {
                 'success': False,
-                'error': 'Request timed out. The model may still be loading. Please try again in a moment.',
+                'error': 'Request timed out. Audio transcription can take several minutes. Please try again with a shorter audio file or wait longer.',
                 'mode': 'ollama'
             }
         except Exception as e:
@@ -351,6 +366,113 @@ class ModelManager:
             self._load_direct_model()
         
         print(f"✅ Switched to {new_mode} mode")
+
+    def analyze_image_with_url(self, image_url: str, prompt: str) -> Dict:
+        """Analyze image using URL with Ollama"""
+        try:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "image", "url": image_url},
+                        {"type": "text", "text": prompt}
+                    ]
+                }
+            ]
+            
+            return self.chat(messages)
+            
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'response': f'Error analyzing image: {str(e)}'
+            }
+
+    def transcribe_audio_with_url(self, audio_url: str, prompt: str = "Transcribe this audio and complete the statement") -> Dict:
+        """Transcribe audio using URL with Gemma 3n"""
+        try:
+            messages = [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "audio", "audio": audio_url},
+                        {"type": "text", "text": prompt}
+                    ]
+                }
+            ]
+            
+            print(f"🔊 Audio transcription request:")
+            print(f"   Audio URL: {audio_url}")
+            print(f"   Prompt: {prompt}")
+            print(f"   Messages: {json.dumps(messages, indent=2)}")
+            
+            result = self.chat(messages)
+            
+            print(f"🔊 Audio transcription result: {result}")
+            
+            # Check if Ollama is asking for the audio file again
+            if (result.get('success') and 
+                result.get('mode') == 'ollama' and 
+                ('ready' in result.get('response', '').lower() or 
+                 'provide the audio' in result.get('response', '').lower() or
+                 'wait for the audio' in result.get('response', '').lower())):
+                
+                print("🔄 Ollama asked for audio again, retrying with explicit instruction...")
+                
+                # Retry with a more explicit instruction
+                retry_messages = [
+                    {
+                        "role": "user",
+                        "content": f"Transcribe the following audio accurately: {audio_url}"
+                    }
+                ]
+                
+                print(f"🔊 Retry messages: {json.dumps(retry_messages, indent=2)}")
+                result = self.chat(retry_messages)
+                print(f"🔊 Retry result: {result}")
+            
+            return result
+            
+        except Exception as e:
+            print(f"🔊 Audio transcription error: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'response': f'Error transcribing audio: {str(e)}'
+            }
+
+    def transcribe_audio_file(self, audio_file_path: str, prompt: str = "Transcribe this audio accurately") -> Dict:
+        """Transcribe audio file using Gemma 3n"""
+        try:
+            # For Ollama, we need to send the audio as a URL that Ollama can access
+            # Since Ollama runs locally, we'll serve the file via HTTP and use the local URL
+            # This follows the same pattern as image analysis
+            
+            import os
+            
+            # Get the filename from the path
+            filename = os.path.basename(audio_file_path)
+            
+            # Create a local URL that Ollama can access
+            # Use 0.0.0.0 instead of localhost for better Ollama compatibility
+            audio_url = f"http://0.0.0.0:11435/{filename}"
+            
+            print(f"🔊 Audio file served via HTTP URL:")
+            print(f"   File: {audio_file_path}")
+            print(f"   Filename: {filename}")
+            print(f"   Audio URL: {audio_url}")
+            
+            # Use the URL-based transcription method
+            return self.transcribe_audio_with_url(audio_url, prompt)
+                
+        except Exception as e:
+            print(f"🔊 Audio file processing error: {e}")
+            return {
+                'success': False,
+                'error': str(e),
+                'response': f'Error transcribing audio file: {str(e)}'
+            }
 
 # Global model manager instance
 model_manager = None

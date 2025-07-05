@@ -87,10 +87,33 @@
                         <h1>RapidCare</h1>
                     </div>
                     <div class="user-info">
-                        <div class="welcome-message">
-                            <span id="welcome-text">Welcome, Paramedic</span>
+                        <div class="voice-input-dropdown">
+                            <button class="voice-input-btn" id="voice-input-btn">
+                                <i class="fas fa-microphone"></i>
+                                <span>Voice Input</span>
+                                <i class="fas fa-chevron-down"></i>
+                            </button>
+                            <div class="voice-dropdown-menu" id="voice-dropdown-menu">
+                                <div class="voice-option" data-method="webkit">
+                                    <i class="fas fa-microphone"></i>
+                                    <span>Browser Speech Recognition</span>
+                                    <small>Real-time transcription</small>
+                                </div>
+                                <div class="voice-option" data-method="gemma">
+                                    <i class="fas fa-brain"></i>
+                                    <span>Gemma 3n AI</span>
+                                    <small>High-quality transcription</small>
+                                </div>
+                                <div class="voice-option" data-method="gemma-finetuned">
+                                    <i class="fas fa-cogs"></i>
+                                    <span>Gemma 3n Fine-tuned</span>
+                                    <small>Medical transcription</small>
+                                </div>
+                            </div>
                         </div>
-                        <button id="logout-btn" class="logout-btn">
+                        
+                        <span id="welcome-text">Welcome</span>
+                        <button class="logout-btn" id="logout-btn">
                             <i class="fas fa-sign-out-alt"></i>
                             Logout
                         </button>
@@ -112,12 +135,29 @@
             <main class="main-content">
                 <!-- System Messages -->
                 <div class="system-messages" id="system-messages">
-                    <div class="message system">
-                        <div class="message-content">
-                            <i class="fas fa-info-circle"></i>
-                            <span>System ready. Select an action to begin.</span>
+                    <div class="system-messages-header" id="system-messages-header">
+                        <div class="system-messages-toggle">
+                            <i class="fas fa-chevron-down" id="system-toggle-icon"></i>
+                            <span id="system-messages-count">1 message</span>
+                        </div>
+                        <button class="clear-messages-btn" id="clear-messages-btn" title="Clear all messages">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                    <div class="system-messages-content" id="system-messages-content">
+                        <div class="message system">
+                            <div class="message-content">
+                                <i class="fas fa-info-circle"></i>
+                                <span>System ready. Select an action to begin.</span>
+                            </div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Patient List -->
+                <div class="patient-section" id="patient-section" style="cursor: pointer;">
+                    <h3>Recent Patients <i class="fas fa-chevron-right" style="font-size: 0.8em; margin-left: 10px;"></i></h3>
+                    <div id="patients-list" class="patients-list"></div>
                 </div>
 
                 <!-- Action Grid -->
@@ -181,12 +221,6 @@
                             View All
                         </button>
                     </div>
-                </div>
-
-                <!-- Patient List -->
-                <div class="patient-section">
-                    <h3>Recent Patients</h3>
-                    <div id="patients-list" class="patients-list"></div>
                 </div>
             </main>
         </div>
@@ -373,6 +407,35 @@
             </div>
         </div>
 
+        <!-- Patients List Modal -->
+        <div id="patients-list-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>All Patients</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="patients-controls">
+                        <div class="patients-stats">
+                            <span id="patients-count">Loading...</span>
+                        </div>
+                        <div class="patients-filters">
+                            <select id="triage-filter">
+                                <option value="">All Triage Levels</option>
+                                <option value="Red">Red - Immediate</option>
+                                <option value="Yellow">Yellow - Delayed</option>
+                                <option value="Green">Green - Minor</option>
+                                <option value="Black">Black - Deceased</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="all-patients-list" class="all-patients-list">
+                        <!-- All patients will be loaded here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Missing Person Modal -->
         <div id="missing-person-modal" class="modal">
             <div class="modal-content">
@@ -471,6 +534,74 @@
         <div id="offline-indicator" class="offline-indicator hidden">
             <i class="fas fa-wifi-slash"></i>
             <span>Working Offline</span>
+        </div>
+
+        <!-- Voice Input Modal -->
+        <div id="voice-input-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Voice Input Options</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="voice-options">
+                        <div class="voice-option" data-method="webkit">
+                            <div class="voice-option-header">
+                                <i class="fas fa-microphone"></i>
+                                <h4>Browser Speech Recognition</h4>
+                            </div>
+                            <p>Real-time transcription using your browser's built-in speech recognition. Fast and responsive.</p>
+                            <button class="btn-primary" onclick="app.startWebkitVoiceInput()">
+                                <i class="fas fa-play"></i>
+                                Start Recording
+                            </button>
+                        </div>
+                        
+                        <div class="voice-option" data-method="gemma">
+                            <div class="voice-option-header">
+                                <i class="fas fa-brain"></i>
+                                <h4>Gemma 3n AI Transcription</h4>
+                            </div>
+                            <p>High-quality transcription using Gemma 3n model. Better accuracy for medical terminology.</p>
+                            <button class="btn-primary" onclick="app.startGemmaVoiceInput()">
+                                <i class="fas fa-upload"></i>
+                                Record & Transcribe
+                            </button>
+                        </div>
+                        
+                        <div class="voice-option" data-method="gemma-finetuned">
+                            <div class="voice-option-header">
+                                <i class="fas fa-cogs"></i>
+                                <h4>Gemma 3n Fine-tuned</h4>
+                            </div>
+                            <p>Specialized medical transcription using fine-tuned Gemma 3n model. Best for clinical documentation.</p>
+                            <button class="btn-primary" onclick="app.startGemmaFineTunedVoiceInput()">
+                                <i class="fas fa-stethoscope"></i>
+                                Medical Transcription
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="voice-recording-section" class="voice-recording-section" style="display: none;">
+                        <div class="recording-status">
+                            <div class="recording-indicator">
+                                <i class="fas fa-circle recording-pulse"></i>
+                                <span id="recording-status-text">Recording...</span>
+                            </div>
+                        </div>
+                        <div class="recording-controls">
+                            <button id="stop-recording-btn" class="btn-secondary">
+                                <i class="fas fa-stop"></i>
+                                Stop Recording
+                            </button>
+                        </div>
+                        <div id="transcription-preview" class="transcription-preview">
+                            <h5>Transcription Preview:</h5>
+                            <div id="transcription-text" class="transcription-text"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 

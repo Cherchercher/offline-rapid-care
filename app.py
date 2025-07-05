@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_from_directory
+from flask import Flask, render_template, request, jsonify, send_from_directory, Response
 import requests
 import json
 import os
@@ -47,8 +47,46 @@ def index():
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
-    """Serve uploaded images"""
-    return send_from_directory(UPLOADS_DIR, filename)
+    """Serve uploaded files with proper MIME types"""
+    import os
+    from flask import send_from_directory, Response
+    
+    file_path = os.path.join(UPLOADS_DIR, filename)
+    
+    if not os.path.exists(file_path):
+        return "File not found", 404
+    
+    # Determine MIME type based on file extension
+    file_ext = os.path.splitext(filename)[1].lower()
+    mime_types = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.wav': 'audio/wav',
+        '.mp3': 'audio/mpeg',
+        '.m4a': 'audio/mp4',
+        '.ogg': 'audio/ogg',
+        '.flac': 'audio/flac',
+        '.mp4': 'video/mp4',
+        '.avi': 'video/x-msvideo',
+        '.mov': 'video/quicktime'
+    }
+    
+    mime_type = mime_types.get(file_ext, 'application/octet-stream')
+    
+    # For audio files, ensure they're served with proper headers
+    if mime_type.startswith('audio/'):
+        with open(file_path, 'rb') as f:
+            audio_data = f.read()
+        
+        response = Response(audio_data, mimetype=mime_type)
+        response.headers['Content-Length'] = len(audio_data)
+        response.headers['Accept-Ranges'] = 'bytes'
+        return response
+    
+    # For other files, use send_from_directory
+    return send_from_directory(UPLOADS_DIR, filename, mimetype=mime_type)
 
 @app.route('/api/chat', methods=['POST'])
 def chat():
@@ -849,6 +887,48 @@ def find_match():
             'search_image_path': image_path,
             'timestamp': datetime.now().isoformat()
         })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/transcribe-audio', methods=['POST'])
+def transcribe_audio():
+    """Transcribe audio using Gemma 3n"""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No audio file provided'}), 400
+        
+        file = request.files['file']
+        prompt = request.form.get('prompt', 'Transcribe this audio accurately')
+        user_role = request.form.get('role', 'PARAMEDIC')
+        
+        if file.filename == '':
+            return jsonify({'error': 'No audio file selected'}), 400
+        
+        # Save uploaded audio
+        filename = f"audio_{uuid.uuid4()}{os.path.splitext(file.filename)[1]}"
+        audio_path = os.path.join('uploads', filename)
+        file.save(audio_path)
+        
+        # Transcribe using Gemma 3n
+        result = model_manager.transcribe_audio_file(audio_path, prompt)
+        
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'transcription': result['response'],
+                'audio_path': audio_path,
+                'timestamp': datetime.now().isoformat(),
+                'mode': result.get('mode', 'unknown')
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': result.get('error', 'Transcription failed')
+            }), 500
         
     except Exception as e:
         return jsonify({
