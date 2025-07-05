@@ -58,24 +58,36 @@ class ModelManager:
     def _load_direct_model(self):
         """Load model directly using transformers"""
         try:
-            print("📥 Loading Gemma 3n model directly...")
+            print("📥 Loading Gemma 3n model from local directory...")
             
-            # Load processor and model
+            # Use local model path
+            local_model_path = "./models/gemma3n-local"
+            
+            # Check if local model exists
+            if not os.path.exists(local_model_path):
+                print(f"❌ Local model not found at {local_model_path}")
+                print("Please run download_gemma_local.py first")
+                raise FileNotFoundError(f"Local model not found at {local_model_path}")
+            
+            # Load processor and model from local directory
             self.direct_processor = AutoProcessor.from_pretrained(
-                "google/gemma-3n-E4B-it", 
-                device_map="auto"
+                local_model_path, 
+                device_map="cpu",
+                trust_remote_code=True
             )
             
             self.direct_model = AutoModelForImageTextToText.from_pretrained(
-                "google/gemma-3n-E4B-it", 
-                torch_dtype="auto", 
-                device_map="auto"
+                local_model_path, 
+                torch_dtype=torch.float32, 
+                device_map="cpu",
+                trust_remote_code=True,
+                low_cpu_mem_usage=True
             )
             
-            print("✅ Direct model loaded successfully")
+            print("✅ Local model loaded successfully on CPU")
             
         except Exception as e:
-            print(f"❌ Failed to load direct model: {e}")
+            print(f"❌ Failed to load local model: {e}")
             raise
     
     def _check_ollama_connection(self):
@@ -286,8 +298,8 @@ class ModelManager:
                 return_tensors="pt"
             )
             
-            # Move to device
-            input_ids = input_ids.to(self.direct_model.device, dtype=self.direct_model.dtype)
+            # Move to CPU with float32
+            input_ids = input_ids.to("cpu", dtype=torch.float32)
             
             # Generate response
             outputs = self.direct_model.generate(
@@ -308,7 +320,7 @@ class ModelManager:
                 'success': True,
                 'response': response_text,
                 'mode': 'direct',
-                'model': self.model_name
+                'model': 'gemma3n-local'
             }
             
         except Exception as e:
