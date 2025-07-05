@@ -358,9 +358,22 @@ class ModelManager:
                 clean_up_tokenization_spaces=False
             )[0]
             
+            # Extract just the model's response (after <start_of_turn>model)
+            if '<start_of_turn>model' in response_text:
+                model_response = response_text.split('<start_of_turn>model')[-1]
+                if '<end_of_turn>' in model_response:
+                    model_response = model_response.split('<end_of_turn>')[0]
+                # Clean up any remaining special tokens
+                model_response = model_response.replace('<bos>', '').replace('<eos>', '').strip()
+            else:
+                model_response = response_text
+            
+            print(f"🔊 Raw response: {response_text}")
+            print(f"🔊 Cleaned response: {model_response}")
+            
             return {
                 'success': True,
-                'response': response_text,
+                'response': model_response,
                 'mode': 'direct',
                 'model': 'gemma3n-local'
             }
