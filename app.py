@@ -937,4 +937,11 @@ def transcribe_audio():
         }), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5050) 
+    # For development, you can use a self-signed certificate
+    # In production, use a proper SSL certificate
+    try:
+        app.run(debug=True, host='0.0.0.0', port=5050, ssl_context='adhoc')
+    except ImportError:
+        print("SSL not available, running without HTTPS")
+        print("Note: MediaDevices API requires HTTPS in most browsers")
+        app.run(debug=True, host='0.0.0.0', port=5050) 
