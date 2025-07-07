@@ -19,6 +19,9 @@ def convert_to_wav(input_path, output_path=None):
     Returns:
         Path to the converted WAV file
     """
+    import time
+    start_time = time.time()
+    
     try:
         if output_path is None:
             # Create output path with .wav extension
@@ -41,15 +44,23 @@ def convert_to_wav(input_path, output_path=None):
         
         result = subprocess.run(cmd, capture_output=True, text=True)
         
+        end_time = time.time()
+        conversion_time = end_time - start_time
+        
         if result.returncode == 0:
             print(f"✅ Converted to: {output_path}")
+            print(f"⏱️  FFmpeg conversion time: {conversion_time:.2f} seconds")
             return str(output_path)
         else:
             print(f"❌ Conversion failed: {result.stderr}")
+            print(f"⏱️  Failed conversion time: {conversion_time:.2f} seconds")
             return None
             
     except Exception as e:
+        end_time = time.time()
+        conversion_time = end_time - start_time
         print(f"❌ Error converting audio: {e}")
+        print(f"⏱️  Error conversion time: {conversion_time:.2f} seconds")
         return None
 
 def check_ffmpeg():

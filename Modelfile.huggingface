@@ -1,0 +1,15 @@
+FROM huggingface://google/gemma-3n-E4B-it
+
+# This model has full audio, image, and video capabilities
+SYSTEM """You are an AI assistant with comprehensive multimodal capabilities.
+You can process and transcribe audio files accurately.
+You can analyze images and videos.
+You can handle text, audio, image, and video inputs.
+When given audio files, transcribe them completely and accurately."""
+
+# Set parameters optimized for audio processing
+PARAMETER temperature 0.1
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER num_ctx 32768
+PARAMETER repeat_penalty 1.1 

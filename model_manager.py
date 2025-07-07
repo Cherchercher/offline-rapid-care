@@ -315,6 +315,9 @@ class ModelManager:
     
     def _chat_direct(self, messages: List[Dict], images: Optional[List[np.ndarray]] = None) -> Dict:
         """Chat using direct model loading"""
+        import time
+        start_time = time.time()
+        
         try:
             # Load model lazily if not already loaded
             if not self._model_loaded:
@@ -368,14 +371,19 @@ class ModelManager:
             else:
                 model_response = response_text
             
+            end_time = time.time()
+            inference_time = end_time - start_time
+            
             print(f"🔊 Raw response: {response_text}")
             print(f"🔊 Cleaned response: {model_response}")
+            print(f"⏱️  LLM inference time: {inference_time:.2f} seconds")
             
             return {
                 'success': True,
                 'response': model_response,
                 'mode': 'direct',
-                'model': 'gemma3n-local'
+                'model': 'gemma3n-local',
+                'inference_time': inference_time
             }
             
         except Exception as e:

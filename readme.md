@@ -1,5 +1,7 @@
 so i am thinking to make a an for mass casualty incidence powered by gemma 3n. The feature i want to build is text voice to text. How do i incorporate the following technologies? Here are some roles i have in mind: ADMIN, PHYSICIAN, NURSE, PARAMEDIC, EMT, REUNIFICATION_COORDINATOR, FIELD_AGENT, TRANSFER_AGENT, LOGISTICS, MEDICAL_ASSISTANT. How do i craft a convincing story for a 3 minute demo?
-
+PARAMEDIC
+REUNIFICATION_COORDINATOR
+NURSE
 The LeRobot Prize
 For the most innovative project that turns Gemma 3n into an action model for robotics or automation using the LeRobot framework.
 
@@ -118,6 +120,35 @@ Use Streamlit, Flask, or a custom Electron/React app for UI
 For LeRobot, make simple task chains like: triage → notify nurse → check resources → alert admin
 
 Would you like help building a basic prototype or interface mockup next?
+
+## 🚨 Use Cases
+
+### 🏥 Emergency Response Teams
+- **Paramedics & EMTs**: Voice-activated triage classification and patient logging
+- **Nurses & Physicians**: Real-time patient status updates and treatment coordination
+- **Field Agents**: RFID scanning and patient identification
+- **Logistics**: Supply tracking and resource management
+
+### 👨‍👩‍👧‍👦 Family Members & Public
+- **Missing Person Reports**: Family members can report missing loved ones via mobile devices
+- **Real-time Updates**: Check patient status and location through secure channels
+- **Photo Uploads**: Upload photos for identification and matching
+- **Voice Descriptions**: Describe missing persons using voice-to-text for faster processing
+
+### 🔄 Reunification Coordination
+- **AI-Powered Matching**: Automatic matching of missing person reports with patient records
+- **Photo Recognition**: Compare uploaded photos with patient images
+- **Status Tracking**: Real-time updates on patient condition and location
+- **Communication Hub**: Centralized system for family inquiries and updates
+
+## 📱 Mobile-First Design
+
+The system is designed to work seamlessly on mobile devices, allowing family members to:
+- **Report missing persons** from anywhere using their smartphones
+- **Upload photos** directly from their camera roll
+- **Use voice input** for hands-free reporting during stressful situations
+- **Receive real-time notifications** about their loved ones
+- **Access the system** through any web browser without app installation
 
 
 

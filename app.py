@@ -921,19 +921,28 @@ def transcribe_audio():
         print(f"   Saved as: {audio_path}")
         
         # Convert to WAV for better compatibility
+        conversion_start = datetime.now()
         try:
             from convert_audio import convert_to_wav
             wav_path = convert_to_wav(audio_path)
+            conversion_time = (datetime.now() - conversion_start).total_seconds()
             if wav_path:
                 audio_path = wav_path
                 print(f"   Converted to WAV: {audio_path}")
+                print(f"   ⏱️  Conversion time: {conversion_time:.2f} seconds")
             else:
                 print(f"   Conversion failed, using original: {audio_path}")
+                print(f"   ⏱️  Conversion attempt time: {conversion_time:.2f} seconds")
         except Exception as e:
+            conversion_time = (datetime.now() - conversion_start).total_seconds()
             print(f"   Conversion error: {e}, using original: {audio_path}")
+            print(f"   ⏱️  Conversion error time: {conversion_time:.2f} seconds")
         
         # Transcribe using Gemma 3n
+        transcription_start = datetime.now()
         result = model_manager.transcribe_audio_file(audio_path, prompt)
+        transcription_time = (datetime.now() - transcription_start).total_seconds()
+        print(f"   ⏱️  Transcription time: {transcription_time:.2f} seconds")
         
         if result['success']:
             return jsonify({

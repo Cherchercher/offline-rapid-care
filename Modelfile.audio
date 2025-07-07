@@ -1,0 +1,29 @@
+FROM gemma3n:e4b
+
+# Enable audio processing capabilities
+SYSTEM """You are an AI assistant with full audio transcription capabilities. 
+You can process and transcribe audio files accurately.
+You have access to audio processing functions and can handle various audio formats.
+When given audio files, transcribe them completely and accurately."""
+
+# Define audio processing capabilities
+TEMPLATE """{{ if .System }}{{ .System }}{{ end }}
+
+{{ if .Prompt }}User: {{ .Prompt }}{{ end }}
+Assistant: Let me help you with that.
+
+{{ if .Audio }}I can process the audio file you've provided. Let me transcribe it for you.{{ end }}
+
+{{ if .Image }}I can analyze the image you've shared.{{ end }}
+
+{{ if .Response }}Here's my response: {{ .Response }}{{ end }}"""
+
+# Set parameters optimized for audio processing
+PARAMETER temperature 0.1
+PARAMETER top_p 0.9
+PARAMETER top_k 40
+PARAMETER num_ctx 8192
+PARAMETER repeat_penalty 1.1
+
+# Enable multimodal capabilities
+PARAMETER multimodal true 
