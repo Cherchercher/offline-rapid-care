@@ -28,7 +28,7 @@ curl -X POST http://localhost:5001/chat/image \
   -d '{
     "messages": [
       {"role": "user", "content": [
-        {"type": "image", "url": "http://localhost:11435/uploads/test.jpg"},
+        {"type": "image", "url": "./uploads/image_20250707_201615_ChatGPT Image Jul 6, 2025, 04_03_01 PM.png"},
         {"type": "text", "text": "Analyze this image for medical triage assessment."}
       ]}
     ]
@@ -56,7 +56,7 @@ curl -X POST http://localhost:5001/chat/audio \
   -d '{
     "messages": [
       {"role": "user", "content": [
-        {"type": "audio", "audio": "/path/to/audio.wav"},
+        {"type": "audio", "audio": "./uploads/audio_f60a5896-f4a4-4eec-97f8-d7f57c396d60_converted.wav"},
         {"type": "text", "text": "Transcribe this audio accurately."}
       ]}
     ]
