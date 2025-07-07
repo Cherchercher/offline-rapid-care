@@ -1,7 +1,7 @@
 # RapidCare - Mass Casualty Incident Response System
 # .gitignore file
-
-# Uploads and media files
+models/
+#Uploads and media files
 uploads/
 *.jpg
 *.jpeg
