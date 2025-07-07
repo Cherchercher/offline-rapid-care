@@ -8,7 +8,7 @@ import json
 from datetime import datetime
 import os
 from typing import List, Dict, Optional, Tuple
-from model_manager import get_model_manager
+from model_manager_api import get_api_model_manager
 
 class VideoProcessor:
     """Video processing for medical triage using Gemma 3n"""
@@ -18,8 +18,8 @@ class VideoProcessor:
         self.ollama_url = ollama_url
         self.model_name = "gemma3n:e4b"
         
-        # Get model manager
-        self.model_manager = get_model_manager()
+        # Get API model manager
+        self.model_manager = get_api_model_manager()
         
         # Video processing settings
         self.frame_interval = 2  # Process every 2nd frame
@@ -103,10 +103,17 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
             ]
             
             # Use model manager to get response
-            result = self.model_manager.chat(messages, images=[processed_frame])
+            # The model manager will now handle both direct images and URLs in messages
+            result = self.model_manager.chat_image(messages)
+            
+            print(f"🔊 Model manager result: {result}")
+            print(f"🔊 Result type: {type(result)}")
+            print(f"🔊 Result keys: {result.keys() if isinstance(result, dict) else 'Not a dict'}")
             
             if result['success']:
                 description = result['response']
+                print(f"🔊 Description type: {type(description)}")
+                print(f"🔊 Description: {description}")
                 triage_level = self.extract_triage_level(description)
                 
                 return {
@@ -178,15 +185,15 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
                         {"type": "text", "text": "Analyze this patient for medical triage assessment."}
                     ]}
                 ]
+                # Don't pass processed_frame since we're using URL
+                result = self.model_manager.chat_image(messages)
             else:
-                # Fallback to base64 if no URL provided
+                # Fallback to direct image processing
                 messages = [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": "Analyze this patient for medical triage assessment."}
                 ]
-            
-            # Use model manager to get response
-            result = self.model_manager.chat(messages, images=[processed_frame] if not image_url else None)
+                result = self.model_manager.chat_image(messages)
             
             if result['success']:
                 description = result['response']

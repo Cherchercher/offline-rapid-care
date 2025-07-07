@@ -733,9 +733,9 @@ class DatabaseManager:
             
             Provide only the structured description, no additional text."""
             
-            # Create image URLs
-            image1_url = f"http://127.0.0.1:5050/{image1_path}"
-            image2_url = f"http://127.0.0.1:5050/{image2_path}"
+            # Create image URLs (use uploads server port)
+            image1_url = f"http://127.0.0.1:11435/{image1_path}"
+            image2_url = f"http://127.0.0.1:11435/{image2_path}"
             
             # Get descriptions
             desc1 = model_manager.analyze_image_with_url(image1_url, prompt)

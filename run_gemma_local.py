@@ -97,47 +97,11 @@ def run_gemma_local():
     
     if audio_files:
         print(f"Found {len(audio_files)} audio files: {audio_files[:3]}...")
-        
-        # Create messages with local audio file paths
-        audio_messages = [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": "Transcribe these audio files in order:"}
-                ]
-            }
-        ]
-        
-        # Add audio files to the message
-        for audio_file in audio_files[:3]:  # Limit to first 3 files
-            audio_messages[0]["content"].append({
-                "type": "audio", 
-                "audio": audio_file
-            })
-        
-        try:
-            input_ids = processor.apply_chat_template(
-                audio_messages,
-                add_generation_prompt=True,
-                tokenize=True, 
-                return_dict=True,
-                return_tensors="pt",
-            )
-            input_ids = input_ids.to("cpu", dtype=torch.float32)
-            
-            outputs = model.generate(**input_ids, max_new_tokens=256)
-            
-            text = processor.batch_decode(
-                outputs,
-                skip_special_tokens=False,
-                clean_up_tokenization_spaces=False
-            )
-            print("Audio transcription response:", text[0])
-        except Exception as e:
-            print(f"Error with audio transcription: {e}")
+        print("Skipping automatic audio processing to avoid conflicts with Flask app")
+        print("Use interactive mode to process audio files manually")
     else:
         print("No audio files found in ./uploads directory")
-        print("You can add audio files to ./uploads/ and run this script again")
+        print("You can add audio files to ./uploads/ and process them in interactive mode")
     
     # Example 3: Interactive mode
     print("\n=== Example 3: Interactive mode ===")

@@ -5,7 +5,7 @@ import os
 from datetime import datetime
 import uuid
 from video_processor import VideoProcessor
-from model_manager import get_model_manager
+from model_manager_api import get_api_model_manager
 from database_setup import get_db_manager
 
 app = Flask(__name__)
@@ -19,8 +19,8 @@ USE_OLLAMA = True  # Set to False to use direct model loading
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-# Initialize model manager and video processor
-model_manager = get_model_manager()
+# Initialize API model manager and video processor
+model_manager = get_api_model_manager()
 video_processor = VideoProcessor()
 
 # In-memory storage for demo (in production, use a proper database)
@@ -443,8 +443,8 @@ def analyze_image_file(file, user_role):
         # Save the uploaded file
         file.save(filepath)
         
-        # Create URL for the image
-        image_url = f"http://127.0.0.1:5050/uploads/{filename}"
+        # Create URL for the image (use uploads server port)
+        image_url = f"http://127.0.0.1:11435/{filename}"
         
         print(f"🔍 Analyzing image with role: {user_role}")
         print(f"📏 Image saved to: {filepath}")

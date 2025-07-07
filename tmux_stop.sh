@@ -3,8 +3,6 @@
 # RapidCare TMUX Stop Script
 # This script stops all RapidCare services running in tmux sessions
 
-set -e
-
 echo "🛑 RapidCare - TMUX Stop"
 echo "========================"
 
@@ -33,75 +31,47 @@ print_error() {
 }
 
 # Stop all RapidCare tmux sessions
-stop_sessions() {
-    print_status "Stopping RapidCare tmux sessions..."
-    
-    # Stop each session if it exists
-    if tmux has-session -t rapidcare-uploads 2>/dev/null; then
-        print_status "Stopping uploads server session..."
-        tmux kill-session -t rapidcare-uploads
-        print_success "Uploads server session stopped"
-    else
-        print_warning "Uploads server session not found"
-    fi
-    
-    if tmux has-session -t rapidcare-app 2>/dev/null; then
-        print_status "Stopping Flask app session..."
-        tmux kill-session -t rapidcare-app
-        print_success "Flask app session stopped"
-    else
-        print_warning "Flask app session not found"
-    fi
-}
+print_status "Stopping RapidCare tmux sessions..."
 
-# Kill any remaining processes
-kill_remaining_processes() {
-    print_status "Checking for remaining RapidCare processes..."
-    
-    # Kill any remaining Python processes related to the app
-    pkill -f "python.*app.py" 2>/dev/null || true
-    pkill -f "python.*serve_uploads.py" 2>/dev/null || true
-    
-    print_success "Process cleanup completed"
-}
+# Stop uploads server session
+if tmux has-session -t rapidcare-uploads 2>/dev/null; then
+    print_status "Stopping rapidcare-uploads session..."
+    tmux kill-session -t rapidcare-uploads
+    print_success "rapidcare-uploads session stopped"
+else
+    print_warning "rapidcare-uploads session not found"
+fi
 
-# Show final status
-show_final_status() {
-    echo ""
-    echo "🎯 Final Status Check:"
-    echo "======================"
-    echo ""
-    
-    # Check if sessions are still running
-    if tmux list-sessions 2>/dev/null | grep -q rapidcare; then
-        echo "⚠️  Some RapidCare sessions may still be running:"
-        tmux list-sessions | grep rapidcare || true
-    else
-        echo "✅ All RapidCare tmux sessions stopped"
-    fi
-    
-    # Check if services are still responding
-    if curl -s http://localhost:11435 > /dev/null 2>&1; then
-        echo "⚠️  Uploads server still responding"
-    fi
-    
-    if curl -s http://localhost:5050 > /dev/null 2>&1; then
-        echo "⚠️  Flask app still responding"
-    fi
-    
-    echo ""
-    echo "🔄 To restart all services:"
-    echo "  ./tmux_start.sh"
-    echo ""
-}
+# Stop model manager session
+if tmux has-session -t rapidcare-model 2>/dev/null; then
+    print_status "Stopping rapidcare-model session..."
+    tmux kill-session -t rapidcare-model
+    print_success "rapidcare-model session stopped"
+else
+    print_warning "rapidcare-model session not found"
+fi
 
-# Main execution
-main() {
-    stop_sessions
-    kill_remaining_processes
-    show_final_status
-    print_success "RapidCare services stopped successfully"
-}
+# Stop Flask app session
+if tmux has-session -t rapidcare-app 2>/dev/null; then
+    print_status "Stopping rapidcare-app session..."
+    tmux kill-session -t rapidcare-app
+    print_success "rapidcare-app session stopped"
+else
+    print_warning "rapidcare-app session not found"
+fi
 
-# Run main function
-main "$@" 
+print_success "All RapidCare tmux sessions stopped"
+echo ""
+echo "📋 Remaining tmux sessions:"
+tmux list-sessions 2>/dev/null || echo "No tmux sessions running"
+echo ""
+echo "🔍 Checking for remaining processes on RapidCare ports..."
+if lsof -ti:11435 > /dev/null 2>&1; then
+    echo "⚠️  Process still running on port 11435 (uploads server)"
+fi
+if lsof -ti:5050 > /dev/null 2>&1; then
+    echo "⚠️  Process still running on port 5050 (Flask app)"
+fi
+if lsof -ti:5001 > /dev/null 2>&1; then
+    echo "⚠️  Process still running on port 5001 (model API server)"
+fi 

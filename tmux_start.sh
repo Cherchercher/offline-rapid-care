@@ -47,24 +47,12 @@ check_tmux() {
     print_success "tmux found: $(tmux -V)"
 }
 
-# Check if Python virtual environment exists
-check_venv() {
-    if [ ! -d "venv" ]; then
-        print_warning "Virtual environment not found. Creating one..."
-        python3 -m venv venv
-        source venv/bin/activate
-        pip install -r requirements.txt
-        print_success "Virtual environment created and dependencies installed"
-    else
-        print_success "Virtual environment found"
-    fi
-}
-
 # Kill existing tmux sessions
 cleanup_sessions() {
     print_status "Cleaning up existing tmux sessions..."
     tmux kill-session -t rapidcare-uploads 2>/dev/null || true
     tmux kill-session -t rapidcare-app 2>/dev/null || true
+    tmux kill-session -t rapidcare-model 2>/dev/null || true
     print_success "Existing sessions cleaned up"
 }
 
@@ -96,9 +84,8 @@ start_uploads_session() {
     # Create new tmux session for uploads server
     tmux new-session -d -s rapidcare-uploads -n uploads
     
-    # Activate virtual environment and start uploads server
-    tmux send-keys -t rapidcare-uploads:uploads "source venv/bin/activate" Enter
-    tmux send-keys -t rapidcare-uploads:uploads "python serve_uploads.py" Enter
+    # Start uploads server
+    tmux send-keys -t rapidcare-uploads:uploads "python3 serve_uploads.py" Enter
     
     # Wait for uploads server to start
     sleep 3
@@ -109,6 +96,27 @@ start_uploads_session() {
     fi
 }
 
+# Start model API server in separate tmux session
+start_model_session() {
+    print_status "Starting model API server in tmux session..."
+    
+    # Create new tmux session for model server
+    tmux new-session -d -s rapidcare-model -n model
+    
+    # Start model API server
+    tmux send-keys -t rapidcare-model:model "python3 model_server.py" Enter
+    
+    # Wait for model server to start
+    sleep 5
+    if curl -s http://localhost:5001/health > /dev/null 2>&1; then
+        print_success "Model API server started successfully"
+    else
+        print_warning "Model API server may still be starting up..."
+    fi
+    
+    print_success "Model API server session created"
+}
+
 # Start Flask app in tmux
 start_app_session() {
     print_status "Starting Flask application in tmux session..."
@@ -116,11 +124,10 @@ start_app_session() {
     # Create new tmux session for Flask app
     tmux new-session -d -s rapidcare-app -n app
     
-    # Activate virtual environment and start Flask app
-    tmux send-keys -t rapidcare-app:app "source venv/bin/activate" Enter
+    # Start Flask app
     tmux send-keys -t rapidcare-app:app "export FLASK_ENV=development" Enter
     tmux send-keys -t rapidcare-app:app "export FLASK_DEBUG=1" Enter
-    tmux send-keys -t rapidcare-app:app "python app.py" Enter
+    tmux send-keys -t rapidcare-app:app "python3 app.py" Enter
     
     # Wait for Flask app to start
     sleep 5
@@ -160,6 +167,13 @@ show_management_info() {
         echo "❌ Flask App: Not responding"
     fi
     
+    # Check model API server
+    if curl -s http://localhost:5001/health > /dev/null 2>&1; then
+        echo "✅ Model API Server: http://localhost:5001"
+    else
+        echo "❌ Model API Server: Not responding"
+    fi
+    
     echo ""
     echo "🔧 TMUX Management Commands:"
     echo "============================"
@@ -170,6 +184,7 @@ show_management_info() {
     echo "Attach to specific sessions:"
     echo "  tmux attach-session -t rapidcare-uploads   # Uploads server"
     echo "  tmux attach-session -t rapidcare-app       # Flask app"
+    echo "  tmux attach-session -t rapidcare-model     # Model API server"
     echo ""
     echo "Monitor all sessions:"
     echo "  tmux attach-session -t rapidcare-app       # Main app"
@@ -178,7 +193,7 @@ show_management_info() {
     echo "  ./tmux_stop.sh"
     echo ""
     echo "Test local model directly:"
-    echo "  python run_gemma_local.py"
+    echo "  python3 run_gemma_local.py"
     echo ""
     echo "View logs in real-time:"
     echo "  tmux attach-session -t rapidcare-app"
@@ -191,10 +206,11 @@ show_management_info() {
 # Main execution
 main() {
     check_tmux
-    check_venv
     check_local_model
     cleanup_sessions
     start_uploads_session
+    sleep 2
+    start_model_session
     sleep 2
     start_app_session
     show_management_info

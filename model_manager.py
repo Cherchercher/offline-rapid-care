@@ -7,7 +7,7 @@ from transformers import AutoProcessor, AutoModelForImageTextToText
 import numpy as np
 from PIL import Image
 import base64
-import io
+from io import BytesIO
 from urllib.parse import urljoin
 
 class ModelManager:
@@ -332,14 +332,106 @@ class ModelManager:
             print(f"   Messages: {json.dumps(messages, indent=2)}")
             print(f"   Has images: {images is not None}")
             
-            # Apply chat template
-            input_ids = self.direct_processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt"
-            )
+            # Helper function to load image from URL
+            def load_image_from_url(url):
+                try:
+                    print(f"🔊 Attempting to load image from: {url}")
+                    
+                    # Try different timeout and retry strategies
+                    for attempt in range(3):
+                        try:
+                            response = requests.get(url, timeout=15, headers={
+                                'User-Agent': 'Mozilla/5.0 (compatible; RapidCare/1.0)'
+                            })
+                            response.raise_for_status()
+                            break
+                        except requests.exceptions.ConnectionError as e:
+                            print(f"🔊 Connection attempt {attempt + 1} failed: {e}")
+                            if attempt < 2:
+                                import time
+                                time.sleep(1)  # Wait before retry
+                            else:
+                                raise
+                    
+                    img = Image.open(BytesIO(response.content)).convert("RGB")
+                    print(f"🔊 Successfully loaded image: {img.size}")
+                    return img
+                except requests.exceptions.ConnectionError as e:
+                    print(f"🔊 Connection error loading image from URL {url}: {e}")
+                    print(f"🔊 This might be because:")
+                    print(f"   - Uploads server is not running on port 11435")
+                    print(f"   - File doesn't exist in uploads directory")
+                    print(f"   - Network connectivity issue")
+                    return None
+                except Exception as e:
+                    print(f"🔊 Error loading image from URL {url}: {e}")
+                    return None
+            
+            # Prepare images for the processor
+            images_to_use = []
+            
+            # First, check if we have direct image data
+            if images and len(images) > 0:
+                print(f"🔊 Processing {len(images)} direct images...")
+                for img in images:
+                    if isinstance(img, str) and img.startswith("http"):
+                        # It's a URL, download it
+                        pil_img = load_image_from_url(img)
+                        if pil_img:
+                            images_to_use.append(pil_img)
+                    elif isinstance(img, Image.Image):
+                        # Already a PIL image
+                        images_to_use.append(img)
+                    else:
+                        # Assume numpy array
+                        if img.dtype != np.uint8:
+                            img = (img * 255).astype(np.uint8)
+                        images_to_use.append(Image.fromarray(img))
+            
+            # Then, check for image URLs in messages (Ollama-style)
+            if not images_to_use:
+                print(f"🔊 Checking for image URLs in messages...")
+                for msg in messages:
+                    if isinstance(msg.get("content"), list):
+                        for item in msg["content"]:
+                            if isinstance(item, dict) and item.get("type") == "image" and "url" in item:
+                                url = item["url"]
+                                pil_img = load_image_from_url(url)
+                                
+                                # Convert Flask app URLs to uploads server URLs
+                                if "127.0.0.1:5050" in url:
+                                    uploads_url = url.replace("127.0.0.1:5050", "127.0.0.1:11435")
+                                    print(f"🔊 Converting to uploads server URL: {uploads_url}")
+                                    pil_img = load_image_from_url(uploads_url)
+                                else:
+                                    pil_img = load_image_from_url(url)
+                                
+                                if pil_img:
+                                    images_to_use.append(pil_img)
+                                    print(f"🔊 Loaded image from URL: {url}")
+                                else:
+                                    print(f"🔊 Failed to load image from URL: {url}")
+            
+            # Apply chat template with or without images
+            if images_to_use:
+                print(f"🔊 Using {len(images_to_use)} images with chat template")
+                input_ids = self.direct_processor.apply_chat_template(
+                    messages,
+                    images=images_to_use,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    return_dict=True,
+                    return_tensors="pt"
+                )
+            else:
+                print(f"🔊 No images found, using text-only chat template")
+                input_ids = self.direct_processor.apply_chat_template(
+                    messages,
+                    add_generation_prompt=True,
+                    tokenize=True,
+                    return_dict=True,
+                    return_tensors="pt"
+                )
             
             # Move to CPU with the same dtype as the model
             model_dtype = next(self.direct_model.parameters()).dtype
@@ -355,11 +447,18 @@ class ModelManager:
             )
             
             # Decode response
-            response_text = self.direct_processor.batch_decode(
+            decoded_outputs = self.direct_processor.batch_decode(
                 outputs,
                 skip_special_tokens=False,
                 clean_up_tokenization_spaces=False
-            )[0]
+            )
+            print(f"🔊 Decoded outputs type: {type(decoded_outputs)}")
+            print(f"🔊 Decoded outputs: {decoded_outputs}")
+            
+            if isinstance(decoded_outputs, list) and len(decoded_outputs) > 0:
+                response_text = decoded_outputs[0]
+            else:
+                response_text = str(decoded_outputs)
             
             # Extract just the model's response (after <start_of_turn>model)
             if '<start_of_turn>model' in response_text:
@@ -376,7 +475,12 @@ class ModelManager:
             
             print(f"🔊 Raw response: {response_text}")
             print(f"🔊 Cleaned response: {model_response}")
+            print(f"🔊 Response type: {type(model_response)}")
             print(f"⏱️  LLM inference time: {inference_time:.2f} seconds")
+            
+            # Ensure response is a string
+            if not isinstance(model_response, str):
+                model_response = str(model_response)
             
             return {
                 'success': True,
