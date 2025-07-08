@@ -164,38 +164,12 @@ def upload_video():
         video_path = f"temp_video_{uuid.uuid4()}.mp4"
         video_file.save(video_path)
         
-        # Create detailed system prompt for structured video analysis
-        system_prompt = f"""You are a {user_role.lower()} performing medical triage assessment from video footage in a mass casualty incident.
-
-MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:
-
-**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]
-**REASONING:** [Clear explanation of triage decision based on observed conditions]
-
-**PATIENT INFORMATION:**
-- **Approximate Age:** [Estimate age range]
-- **Gender:** [Male/Female/Unknown]
-- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]
-- **Brief Assessment Findings:** [Key observations from the video]
-
-**TRIAGE CATEGORY DETAILS:**
-- **RED (Immediate):** Life-threatening injuries requiring immediate attention
-- **YELLOW (Delayed):** Serious injuries that can wait for treatment  
-- **GREEN (Minor):** Minor injuries that can wait or self-treat
-- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life
-
-**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]
-
-CRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure. Focus on visible injuries, level of consciousness, breathing patterns, bleeding, and overall patient condition."""
-        
         # Use the new API approach for video processing
         messages = [
-            {"role": "system", "content": system_prompt},
             {
                 "role": "user", 
                 "content": [
-                    {"type": "video", "path": video_path},
-                    {"type": "text", "text": "Analyze this video for medical triage assessment. Provide structured output with triage level, reasoning, patient information, and immediate actions."}
+                    {"type": "video", "path": video_path}
                 ]
             }
         ]
@@ -233,38 +207,12 @@ def analyze_video():
         if not video_path or not os.path.exists(video_path):
             return jsonify({'error': 'Video file not found'}), 404
         
-        # Create detailed system prompt for structured video analysis
-        system_prompt = f"""You are a {user_role.lower()} performing medical triage assessment from video footage in a mass casualty incident.
-
-MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:
-
-**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]
-**REASONING:** [Clear explanation of triage decision based on observed conditions]
-
-**PATIENT INFORMATION:**
-- **Approximate Age:** [Estimate age range]
-- **Gender:** [Male/Female/Unknown]
-- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]
-- **Brief Assessment Findings:** [Key observations from the video]
-
-**TRIAGE CATEGORY DETAILS:**
-- **RED (Immediate):** Life-threatening injuries requiring immediate attention
-- **YELLOW (Delayed):** Serious injuries that can wait for treatment  
-- **GREEN (Minor):** Minor injuries that can wait or self-treat
-- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life
-
-**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]
-
-CRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure. Focus on visible injuries, level of consciousness, breathing patterns, bleeding, and overall patient condition."""
-        
         # Use the new API approach - same as direct curl call
         messages = [
-            {"role": "system", "content": system_prompt},
             {
                 "role": "user", 
                 "content": [
-                    {"type": "video", "path": video_path},
-                    {"type": "text", "text": "Analyze this video for medical triage assessment. Provide structured output with triage level, reasoning, patient information, and immediate actions."}
+                    {"type": "video", "path": video_path}
                 ]
             }
         ]
@@ -318,38 +266,13 @@ def analyze_frame():
         image.save(buffer, format='JPEG')
         frame_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
         
-        # Create detailed system prompt for structured frame analysis
-        system_prompt = f"""You are a {user_role.lower()} performing medical triage assessment from a single video frame in a mass casualty incident.
-
-MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:
-
-**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]
-**REASONING:** [Clear explanation of triage decision based on observed conditions]
-
-**PATIENT INFORMATION:**
-- **Approximate Age:** [Estimate age range]
-- **Gender:** [Male/Female/Unknown]
-- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]
-- **Brief Assessment Findings:** [Key observations from the frame]
-
-**TRIAGE CATEGORY DETAILS:**
-- **RED (Immediate):** Life-threatening injuries requiring immediate attention
-- **YELLOW (Delayed):** Serious injuries that can wait for treatment  
-- **GREEN (Minor):** Minor injuries that can wait or self-treat
-- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life
-
-**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]
-
-CRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure. Focus on visible injuries, level of consciousness, breathing patterns, bleeding, and overall patient condition visible in this single frame."""
-        
         # Use the new API approach for frame analysis
         messages = [
-            {"role": "system", "content": system_prompt},
             {
                 "role": "user", 
                 "content": [
                     {"type": "image", "path": f"data:image/jpeg;base64,{frame_base64}"},
-                    {"type": "text", "text": "Analyze this frame for medical triage assessment. Provide structured output with triage level, reasoning, patient information, and immediate actions."}
+                    {"type": "text", "text": "MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:\n\n**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]\n**REASONING:** [Clear explanation of triage decision based on observed conditions]\n\n**PATIENT INFORMATION:**\n- **Approximate Age:** [Estimate age range]\n- **Gender:** [Male/Female/Unknown]\n- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]\n- **Brief Assessment Findings:** [Key observations from the frame]\n\n**TRIAGE CATEGORY DETAILS:**\n- **RED (Immediate):** Life-threatening injuries requiring immediate attention\n- **YELLOW (Delayed):** Serious injuries that can wait for treatment  \n- **GREEN (Minor):** Minor injuries that can wait or self-treat\n- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life\n\n**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]\n\nCRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure."}
                 ]
             }
         ]
@@ -609,38 +532,12 @@ def analyze_video_file(file, user_role):
             file.save(tmp_file.name)
             tmp_path = tmp_file.name
         
-        # Create detailed system prompt for structured video analysis
-        system_prompt = f"""You are a {user_role.lower()} performing medical triage assessment from video footage in a mass casualty incident.
-
-MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:
-
-**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]
-**REASONING:** [Clear explanation of triage decision based on observed conditions]
-
-**PATIENT INFORMATION:**
-- **Approximate Age:** [Estimate age range]
-- **Gender:** [Male/Female/Unknown]
-- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]
-- **Brief Assessment Findings:** [Key observations from the video]
-
-**TRIAGE CATEGORY DETAILS:**
-- **RED (Immediate):** Life-threatening injuries requiring immediate attention
-- **YELLOW (Delayed):** Serious injuries that can wait for treatment  
-- **GREEN (Minor):** Minor injuries that can wait or self-treat
-- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life
-
-**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]
-
-CRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure. Focus on visible injuries, level of consciousness, breathing patterns, bleeding, and overall patient condition."""
-        
         # Use the new API approach - same as direct curl call
         messages = [
-            {"role": "system", "content": system_prompt},
             {
                 "role": "user", 
                 "content": [
-                    {"type": "video", "path": tmp_path},
-                    {"type": "text", "text": "Analyze this video for medical triage assessment. Provide structured output with triage level, reasoning, patient information, and immediate actions."}
+                    {"type": "video", "path": tmp_path}
                 ]
             }
         ]
