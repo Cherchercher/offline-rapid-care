@@ -719,8 +719,8 @@ class RapidCareApp {
         const modal = document.getElementById('triage-modal');
         const body = document.getElementById('triage-modal-body');
 
-        // Check if analysis exists and has description
-        if (!analysis || !analysis.description) {
+        // Check if analysis exists and has description or response
+        if (!analysis || (!analysis.description && !analysis.response)) {
             console.error('Invalid analysis data:', analysis);
             body.innerHTML = `
                 <div class="triage-result">
@@ -743,11 +743,21 @@ class RapidCareApp {
             return;
         }
 
+        // Use description if available, otherwise use response (for video analysis)
+        const analysisText = analysis.description || analysis.response || '';
+
         // Extract individual analysis from combined result
-        const individualAnalysis = this.extractIndividualAnalysis(analysis.description);
+        const individualAnalysis = this.extractIndividualAnalysis(analysisText);
         
-        // Parse triage data
-        const triageData = this.parseTriageResponse(individualAnalysis);
+        // Parse triage data - handle video responses differently
+        let triageData;
+        if (analysis.response && analysis.frames_analyzed) {
+            // This is a video response, use special parsing
+            triageData = this.parseVideoResponse(analysisText);
+        } else {
+            // This is a regular image/text response
+            triageData = this.parseTriageResponse(individualAnalysis);
+        }
         
         // Create image preview if available
         const imagePreview = analysis.image_url ? `
@@ -846,6 +856,30 @@ class RapidCareApp {
         return combinedAnalysis;
     }
 
+    // Special handling for video analysis responses
+    parseVideoResponse(videoAnalysis) {
+        console.log('Parsing video analysis:', videoAnalysis);
+        
+        // Try to extract triage information from video analysis
+        const triageMatch = videoAnalysis.match(/\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*/i);
+        const level = triageMatch ? triageMatch[1] : 'Yellow';
+        
+        // Extract reasoning from the video analysis
+        let reasoning = 'Video analysis completed';
+        if (videoAnalysis.includes('**Video Frames:**')) {
+            const framesMatch = videoAnalysis.match(/\*\*Video Frames:\*\*([\s\S]*?)(?=\*\*Medical Triage Assessment:|$)/);
+            if (framesMatch) {
+                reasoning = framesMatch[1].trim();
+            }
+        }
+        
+        return {
+            level: level,
+            reasoning: reasoning,
+            actions: ['Review video analysis', 'Follow standard protocols', 'Document observations']
+        };
+    }
+
     parseTriageResponse(response) {
         console.log('Parsing triage response:', response);
         
@@ -859,22 +893,74 @@ class RapidCareApp {
             };
         }
 
-        // Extract triage level
-        const triageMatch = response.match(/\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*/i);
-        const level = triageMatch ? triageMatch[1] : 'Yellow';
-
-        // Extract reasoning
-        const reasoningMatch = response.match(/\*\*Reasoning:\*\*\s*([^*]+?)(?=\*\*Action:\*\*)/s);
-        const reasoning = reasoningMatch ? reasoningMatch[1].trim() : 'Assessment completed based on visual analysis';
-
-        // Extract actions
-        const actionMatch = response.match(/\*\*Action:\*\*\s*([\s\S]*?)(?=\n\n|$)/);
+        // Try multiple parsing strategies
+        let level = 'Yellow';
+        let reasoning = 'Assessment completed based on visual analysis';
         let actions = ['Follow standard protocols'];
-        
-        if (actionMatch) {
-            const actionText = actionMatch[1];
-            // Split by numbered items
+
+        // Strategy 1: Look for exact format
+        const exactMatch = response.match(/\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*\s*\*\*Reasoning:\*\*\s*([^*]+?)(?=\*\*Action:\*\*)\s*\*\*Action:\*\*\s*([\s\S]*?)(?=\n\n|$)/i);
+        if (exactMatch) {
+            level = exactMatch[1];
+            reasoning = exactMatch[2].trim();
+            const actionText = exactMatch[3].trim();
             actions = actionText.split(/\d+\.\s*/).filter(item => item.trim()).map(item => item.trim());
+        } else {
+            // Strategy 2: Extract triage level from anywhere in text
+            const triageMatch = response.match(/\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*/i);
+            if (triageMatch) {
+                level = triageMatch[1];
+            }
+
+            // Strategy 3: Look for reasoning patterns
+            const reasoningPatterns = [
+                /\*\*Reasoning:\*\*\s*([^*]+?)(?=\*\*Action:\*\*|$)/s,
+                /Reasoning:\s*([^*]+?)(?=Action:|$)/s,
+                /Assessment:\s*([^*]+?)(?=\n\n|$)/s
+            ];
+            
+            for (const pattern of reasoningPatterns) {
+                const match = response.match(pattern);
+                if (match) {
+                    reasoning = match[1].trim();
+                    break;
+                }
+            }
+
+            // Strategy 4: Look for action patterns
+            const actionPatterns = [
+                /\*\*Action:\*\*\s*([\s\S]*?)(?=\n\n|$)/,
+                /Action:\s*([\s\S]*?)(?=\n\n|$)/,
+                /Recommended Actions:\s*([\s\S]*?)(?=\n\n|$)/,
+                /Immediate Concerns[^:]*:\s*([\s\S]*?)(?=\n\n|$)/s
+            ];
+            
+            for (const pattern of actionPatterns) {
+                const match = response.match(pattern);
+                if (match) {
+                    const actionText = match[1].trim();
+                    // Split by bullet points, numbers, or new lines
+                    actions = actionText.split(/(?:\d+\.\s*|\*\s*|\n\s*[-*]\s*)/).filter(item => item.trim()).map(item => item.trim());
+                    break;
+                }
+            }
+
+            // Strategy 5: If no actions found, extract from the overall text
+            if (actions.length === 1 && actions[0] === 'Follow standard protocols') {
+                // Look for any bullet points or numbered lists
+                const bulletMatches = response.match(/(?:[-*]\s*|\d+\.\s*)([^\n]+)/g);
+                if (bulletMatches) {
+                    actions = bulletMatches.map(item => item.replace(/^[-*]\s*|\d+\.\s*/, '').trim()).filter(item => item.length > 10);
+                }
+            }
+        }
+
+        // Fallback: If still no good reasoning, use the first paragraph
+        if (reasoning === 'Assessment completed based on visual analysis') {
+            const paragraphs = response.split('\n\n').filter(p => p.trim().length > 20);
+            if (paragraphs.length > 0) {
+                reasoning = paragraphs[0].trim();
+            }
         }
 
         console.log('Parsed triage data:', { level, reasoning, actions });

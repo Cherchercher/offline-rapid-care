@@ -22,9 +22,9 @@ class VideoProcessor:
         self.model_manager = get_api_model_manager()
         
         # Video processing settings
-        self.frame_interval = 2  # Process every 2nd frame
-        self.max_frames = 10     # Maximum frames to process
-        self.image_size = (512, 512)  # Resize images for model
+        self.frame_interval = 5  # Process every 5th frame (was 2)
+        self.max_frames = 3      # Maximum frames to process (was 10)
+        self.image_size = (256, 256)  # Resize images for model (was 512x512)
         
         # Triage categories
         self.triage_levels = ["Red", "Yellow", "Green", "Black"]
@@ -264,51 +264,53 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
     def process_video(self, video_path: str, role: str = "PARAMEDIC") -> Dict:
         """Process entire video and provide comprehensive analysis"""
         try:
-            # Extract frames
-            frames = self.extract_frames(video_path)
+            print(f"🔊 Processing video: {video_path}")
             
-            if not frames:
+            # Use HTTP request to model server (like the working curl command)
+            import requests
+            import json
+            
+            # Prepare the request payload
+            payload = {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": [
+                            {"type": "video", "path": video_path},
+                            {"type": "text", "text": "Analyze this video for medical triage assessment."}
+                        ]
+                    }
+                ]
+            }
+            
+            print(f"🔊 Sending HTTP request to model server...")
+            print(f"🔊 Payload: {json.dumps(payload, indent=2)}")
+            
+            # Send request to model server
+            response = requests.post(
+                "http://localhost:5001/chat/video",
+                json=payload,
+                headers={"Content-Type": "application/json"},
+                timeout=300  # 5 minute timeout
+            )
+            
+            print(f"🔊 HTTP response status: {response.status_code}")
+            
+            if response.status_code == 200:
+                result = response.json()
+                print(f"🔊 Video analysis result: {result}")
+                return result
+            else:
+                error_msg = f"HTTP {response.status_code}: {response.text}"
+                print(f"🔊 HTTP error: {error_msg}")
                 return {
-                    'error': 'No frames extracted from video',
+                    'error': error_msg,
+                    'video_path': video_path,
                     'analysis': []
                 }
             
-            # Analyze each frame
-            analyses = []
-            for i, frame in enumerate(frames):
-                analysis = self.analyze_frame(frame, role)
-                analysis['frame_number'] = i
-                analyses.append(analysis)
-            
-            # Aggregate results
-            triage_counts = {}
-            for analysis in analyses:
-                level = analysis.get('triage_level', 'Unknown')
-                triage_counts[level] = triage_counts.get(level, 0) + 1
-            
-            # Determine overall triage level (highest priority wins)
-            priority_order = ['Black', 'Red', 'Yellow', 'Green']
-            overall_triage = 'Green'
-            for level in priority_order:
-                if triage_counts.get(level, 0) > 0:
-                    overall_triage = level
-                    break
-            
-            # Get most detailed description
-            best_analysis = max(analyses, key=lambda x: len(x.get('description', '')))
-            
-            return {
-                'video_path': video_path,
-                'frames_analyzed': len(frames),
-                'overall_triage': overall_triage,
-                'triage_distribution': triage_counts,
-                'primary_description': best_analysis.get('description', ''),
-                'frame_analyses': analyses,
-                'timestamp': datetime.now().isoformat(),
-                'processing_method': self.model_manager.mode
-            }
-            
         except Exception as e:
+            print(f"🔊 Exception in process_video: {e}")
             return {
                 'error': str(e),
                 'video_path': video_path,
