@@ -4,7 +4,6 @@ import json
 import os
 from datetime import datetime
 import uuid
-from video_processor import VideoProcessor
 from model_manager_api import get_api_model_manager
 from database_setup import get_db_manager
 
@@ -19,9 +18,8 @@ USE_OLLAMA = True  # Set to False to use direct model loading
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 
-# Initialize API model manager and video processor
+# Initialize API model manager
 model_manager = get_api_model_manager()
-video_processor = VideoProcessor()
 
 # In-memory storage for demo (in production, use a proper database)
 patients = {}
@@ -166,8 +164,20 @@ def upload_video():
         video_path = f"temp_video_{uuid.uuid4()}.mp4"
         video_file.save(video_path)
         
-        # Process video
-        analysis_results = video_processor.process_video(video_path, user_role)
+        # Use the new API approach for video processing
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "video", "path": video_path},
+                    {"type": "text", "text": f"Analyze this video for medical triage assessment as a {user_role.lower()}."}
+                ]
+            }
+        ]
+        
+        # Use the model manager's video endpoint
+        result = model_manager.chat_video(messages)
+        analysis_results = result.get('response', 'Error analyzing video') if result['success'] else result.get('error', 'Unknown error')
         
         # Clean up temporary file
         try:
@@ -189,7 +199,7 @@ def upload_video():
 
 @app.route('/api/video/analyze', methods=['POST'])
 def analyze_video():
-    """Analyze video from URL or existing file"""
+    """Analyze video from URL or existing file using the new API approach"""
     try:
         data = request.json
         video_path = data.get('video_path', '')
@@ -198,13 +208,27 @@ def analyze_video():
         if not video_path or not os.path.exists(video_path):
             return jsonify({'error': 'Video file not found'}), 404
         
-        # Process video
-        analysis_results = video_processor.process_video(video_path, user_role)
+        # Use the new API approach - same as direct curl call
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "video", "path": video_path},
+                    {"type": "text", "text": f"Analyze this video for medical triage assessment as a {user_role.lower()}."}
+                ]
+            }
+        ]
+        
+        # Use the model manager's video endpoint
+        result = model_manager.chat_video(messages)
         
         return jsonify({
-            'success': True,
-            'analysis': analysis_results,
-            'timestamp': datetime.now().isoformat()
+            'success': result['success'],
+            'analysis': result.get('response', '') if result['success'] else result.get('error', 'Unknown error'),
+            'timestamp': datetime.now().isoformat(),
+            'mode': result.get('mode', 'unknown'),
+            'inference_time': result.get('inference_time', 0),
+            'frames_analyzed': result.get('frames_analyzed', 0)
         })
         
     except Exception as e:
@@ -235,8 +259,29 @@ def analyze_frame():
         image = Image.open(io.BytesIO(image_data))
         frame = np.array(image)
         
-        # Analyze frame
-        analysis = video_processor.analyze_frame(frame, user_role)
+        # Convert frame to base64 for API call
+        import base64
+        import io
+        
+        # Convert PIL image to base64
+        buffer = io.BytesIO()
+        image.save(buffer, format='JPEG')
+        frame_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+        
+        # Use the new API approach for frame analysis
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "image", "path": f"data:image/jpeg;base64,{frame_base64}"},
+                    {"type": "text", "text": f"Analyze this frame for medical triage assessment as a {user_role.lower()}."}
+                ]
+            }
+        ]
+        
+        # Use the model manager's image endpoint
+        result = model_manager.chat_image(messages)
+        analysis = result.get('response', 'Error analyzing frame') if result['success'] else result.get('error', 'Unknown error')
         
         return jsonify({
             'success': True,
@@ -455,7 +500,20 @@ def analyze_image_file(file, user_role):
         frame = np.array(image)
         
         # Analyze using video processor with URL
-        analysis = video_processor.analyze_frame_with_url(frame, user_role, image_url)
+        # Use the new API approach for frame analysis with URL
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "image", "path": image_url},
+                    {"type": "text", "text": f"Analyze this frame for medical triage assessment as a {user_role.lower()}."}
+                ]
+            }
+        ]
+        
+        # Use the model manager's image endpoint
+        result = model_manager.chat_image(messages)
+        analysis = result.get('response', 'Error analyzing frame') if result['success'] else result.get('error', 'Unknown error')
         
         print(f"📊 Analysis result: {analysis}")
         
@@ -466,7 +524,7 @@ def analyze_image_file(file, user_role):
         return f"Error analyzing image: {str(e)}"
 
 def analyze_video_file(file, user_role):
-    """Analyze an uploaded video file"""
+    """Analyze an uploaded video file using the new API approach"""
     try:
         # Save video temporarily
         import tempfile
@@ -476,8 +534,19 @@ def analyze_video_file(file, user_role):
             file.save(tmp_file.name)
             tmp_path = tmp_file.name
         
-        # Process video
-        analysis = video_processor.process_video(tmp_path, user_role)
+        # Use the new API approach - same as direct curl call
+        messages = [
+            {
+                "role": "user", 
+                "content": [
+                    {"type": "video", "path": tmp_path},
+                    {"type": "text", "text": f"Analyze this video for medical triage assessment as a {user_role.lower()}."}
+                ]
+            }
+        ]
+        
+        # Use the model manager's video endpoint
+        result = model_manager.chat_video(messages)
         
         # Clean up
         try:
@@ -485,7 +554,10 @@ def analyze_video_file(file, user_role):
         except:
             pass
         
-        return analysis
+        if result['success']:
+            return result['response']
+        else:
+            return f"Error analyzing video: {result.get('error', 'Unknown error')}"
         
     except Exception as e:
         return f"Error analyzing video: {str(e)}"
@@ -748,7 +820,6 @@ def status():
     return jsonify({
         'model_status': model_status,
         'patients_count': len(patients),
-        'video_processor_status': video_processor.get_status(),
         'timestamp': datetime.now().isoformat()
     })
 
@@ -757,11 +828,6 @@ def get_config():
     """Get application configuration"""
     return jsonify({
         'model_config': model_manager.get_status(),
-        'video_processor_config': {
-            'frame_interval': video_processor.frame_interval,
-            'max_frames': video_processor.max_frames,
-            'image_size': video_processor.image_size
-        },
         'roles': roles
     })
 

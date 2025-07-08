@@ -719,8 +719,20 @@ class RapidCareApp {
         const modal = document.getElementById('triage-modal');
         const body = document.getElementById('triage-modal-body');
 
-        // Check if analysis exists and has description
-        if (!analysis || !analysis.description) {
+        // Handle both old and new response formats
+        let analysisText = '';
+        let confidence = 0.8; // Default confidence
+        let imageUrl = null;
+        
+        if (typeof analysis === 'string') {
+            // New format: analysis is directly the string
+            analysisText = analysis;
+        } else if (analysis && analysis.description) {
+            // Old format: analysis.description contains the text
+            analysisText = analysis.description;
+            confidence = analysis.confidence || 0.8;
+            imageUrl = analysis.image_url;
+        } else {
             console.error('Invalid analysis data:', analysis);
             body.innerHTML = `
                 <div class="triage-result">
@@ -744,17 +756,17 @@ class RapidCareApp {
         }
 
         // Extract individual analysis from combined result
-        const individualAnalysis = this.extractIndividualAnalysis(analysis.description);
+        const individualAnalysis = this.extractIndividualAnalysis(analysisText);
         
         // Parse triage data
         const triageData = this.parseTriageResponse(individualAnalysis);
         
         // Create image preview if available
-        const imagePreview = analysis.image_url ? `
+        const imagePreview = imageUrl ? `
             <div class="image-preview">
                 <h5>Patient Image:</h5>
                 <div class="image-container">
-                    <img src="${analysis.image_url}" alt="Patient Image" class="patient-image" />
+                    <img src="${imageUrl}" alt="Patient Image" class="patient-image" />
                 </div>
             </div>
         ` : '';
@@ -763,7 +775,7 @@ class RapidCareApp {
             <div class="triage-result">
                 <div class="triage-header ${triageData.level.toLowerCase()}">
                     <h4>Triage Level: ${triageData.level}</h4>
-                    <div class="confidence">Confidence: ${Math.round(analysis.confidence * 100)}%</div>
+                    <div class="confidence">Confidence: ${Math.round(confidence * 100)}%</div>
                 </div>
                 
                 ${imagePreview}
@@ -859,22 +871,155 @@ class RapidCareApp {
             };
         }
 
-        // Extract triage level
-        const triageMatch = response.match(/\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*/i);
-        const level = triageMatch ? triageMatch[1] : 'Yellow';
+        // Extract triage level - flexible pattern matching
+        let level = 'Yellow'; // Default fallback
+        
+        // Try multiple patterns for triage level
+        const triagePatterns = [
+            /\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*/i,
+            /Triage:\s*(RED|YELLOW|GREEN|BLACK)/i,
+            /Triage Level:\s*(RED|YELLOW|GREEN|BLACK)/i,
+            /Category:\s*(RED|YELLOW|GREEN|BLACK)/i,
+            /Priority:\s*(RED|YELLOW|GREEN|BLACK)/i
+        ];
+        
+        for (const pattern of triagePatterns) {
+            const match = response.match(pattern);
+            if (match) {
+                level = match[1];
+                break;
+            }
+        }
+        
+        // If no explicit triage level found, infer from content
+        if (level === 'Yellow') {
+            const text = response.toLowerCase();
+            
+            // Red indicators
+            if (text.includes('red') || text.includes('immediate') || text.includes('critical') || 
+                text.includes('life-threatening') || text.includes('severe trauma') || 
+                text.includes('highest priority') || text.includes('emergency')) {
+                level = 'Red';
+            }
+            // Black indicators
+            else if (text.includes('black') || text.includes('deceased') || text.includes('dead') ||
+                     text.includes('incompatible with life') || text.includes('expectant')) {
+                level = 'Black';
+            }
+            // Green indicators
+            else if (text.includes('green') || text.includes('minor') || text.includes('stable') ||
+                     text.includes('non-urgent') || text.includes('walking wounded')) {
+                level = 'Green';
+            }
+            // Yellow indicators (default)
+            else if (text.includes('yellow') || text.includes('urgent') || text.includes('serious') ||
+                     text.includes('delayed') || text.includes('moderate')) {
+                level = 'Yellow';
+            }
+        }
 
-        // Extract reasoning
-        const reasoningMatch = response.match(/\*\*Reasoning:\*\*\s*([^*]+?)(?=\*\*Action:\*\*)/s);
-        const reasoning = reasoningMatch ? reasoningMatch[1].trim() : 'Assessment completed based on visual analysis';
+        // Extract reasoning - flexible content extraction
+        let reasoning = 'Assessment completed based on visual analysis';
+        
+        // Try to find reasoning section
+        const reasoningPatterns = [
+            /\*\*Reasoning:\*\*\s*([\s\S]*?)(?=\*\*Action:\*\*|\*\*Actions:\*\*|\*\*Recommendations:\*\*|$)/i,
+            /Reasoning:\s*([\s\S]*?)(?=Action:|Actions:|Recommendations:|$)/i,
+            /Assessment:\s*([\s\S]*?)(?=Action:|Actions:|Recommendations:|$)/i,
+            /Analysis:\s*([\s\S]*?)(?=Action:|Actions:|Recommendations:|$)/i
+        ];
+        
+        for (const pattern of reasoningPatterns) {
+            const match = response.match(pattern);
+            if (match) {
+                reasoning = match[1].trim();
+                break;
+            }
+        }
+        
+        // If no reasoning section found, extract meaningful content
+        if (reasoning === 'Assessment completed based on visual analysis') {
+            // Split into paragraphs and find the most descriptive one
+            const paragraphs = response.split('\n\n').filter(p => p.trim() && p.length > 50);
+            if (paragraphs.length > 0) {
+                // Find the paragraph with the most medical/assessment keywords
+                const medicalKeywords = ['patient', 'injury', 'trauma', 'condition', 'assessment', 'medical', 'treatment', 'symptoms'];
+                let bestParagraph = paragraphs[0];
+                let maxKeywords = 0;
+                
+                for (const paragraph of paragraphs) {
+                    const keywordCount = medicalKeywords.filter(keyword => 
+                        paragraph.toLowerCase().includes(keyword)
+                    ).length;
+                    if (keywordCount > maxKeywords) {
+                        maxKeywords = keywordCount;
+                        bestParagraph = paragraph;
+                    }
+                }
+                reasoning = bestParagraph.trim();
+            }
+        }
 
-        // Extract actions
-        const actionMatch = response.match(/\*\*Action:\*\*\s*([\s\S]*?)(?=\n\n|$)/);
+        // Extract actions - flexible action extraction
         let actions = ['Follow standard protocols'];
         
-        if (actionMatch) {
-            const actionText = actionMatch[1];
-            // Split by numbered items
-            actions = actionText.split(/\d+\.\s*/).filter(item => item.trim()).map(item => item.trim());
+        // Try to find actions section
+        const actionPatterns = [
+            /\*\*Action:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
+            /\*\*Actions:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
+            /\*\*Recommendations:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
+            /Action:\s*([\s\S]*?)(?=\n\n|$)/i,
+            /Actions:\s*([\s\S]*?)(?=\n\n|$)/i,
+            /Recommendations:\s*([\s\S]*?)(?=\n\n|$)/i
+        ];
+        
+        for (const pattern of actionPatterns) {
+            const match = response.match(pattern);
+            if (match) {
+                const actionText = match[1];
+                // Split by various list formats
+                const listItems = actionText.split(/(?:\d+\.|\*|\-)\s*/).filter(item => item.trim());
+                if (listItems.length > 0) {
+                    actions = listItems.slice(0, 5); // Limit to 5 actions
+                    break;
+                }
+            }
+        }
+        
+        // If no actions section found, extract key points
+        if (actions.length === 1 && actions[0] === 'Follow standard protocols') {
+            // Look for numbered or bulleted lists
+            const listPatterns = [
+                /\d+\.\s*\*\*([^*]+)\*\*:?\s*([^*]+)/g,
+                /\d+\.\s*([^*]+):\s*([^*]+)/g,
+                /\*\s*\*\*([^*]+)\*\*:?\s*([^*]+)/g,
+                /\*\s*([^*]+):\s*([^*]+)/g
+            ];
+            
+            for (const pattern of listPatterns) {
+                const matches = response.match(pattern);
+                if (matches && matches.length > 0) {
+                    actions = matches.slice(0, 5).map(item => 
+                        item.replace(/(?:\d+\.|\*)\s*\*\*([^*]+)\*\*:?\s*/, '$1: ')
+                           .replace(/(?:\d+\.|\*)\s*([^*]+):\s*/, '$1: ')
+                    );
+                    break;
+                }
+            }
+            
+            // If still no actions, extract sentences that look like recommendations
+            if (actions.length === 1 && actions[0] === 'Follow standard protocols') {
+                const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 20);
+                const recommendationKeywords = ['assess', 'check', 'monitor', 'provide', 'ensure', 'prepare', 'administer', 'evaluate'];
+                
+                const recommendations = sentences.filter(sentence => 
+                    recommendationKeywords.some(keyword => sentence.toLowerCase().includes(keyword))
+                );
+                
+                if (recommendations.length > 0) {
+                    actions = recommendations.slice(0, 4).map(s => s.trim());
+                }
+            }
         }
 
         console.log('Parsed triage data:', { level, reasoning, actions });
