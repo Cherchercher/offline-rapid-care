@@ -202,138 +202,16 @@ class ModelManagerPipeline:
             
             start_time = time.time()
             
-            # Validate and preprocess messages
-            print(f"🔊 Validating message format...")
-            processed_messages = []
-            
-            for msg in messages:
-                if not isinstance(msg, dict) or 'role' not in msg or 'content' not in msg:
-                    raise ValueError(f"Invalid message format: {msg}")
-                
-                role = msg['role']
-                content = msg['content']
-                
-                # Handle different content formats
-                if isinstance(content, str):
-                    # Simple text message
-                    processed_messages.append({
-                        'role': role,
-                        'content': content
-                    })
-                elif isinstance(content, list):
-                    # Multimodal message with images/text
-                    processed_content = []
-                    images = []
-                    
-                    for item in content:
-                        if isinstance(item, dict):
-                            if item.get('type') == 'image' and item.get('url'):
-                                # Load image from URL
-                                image = self._load_image_from_url(item['url'])
-                                if image:
-                                    images.append(image)
-                                    print(f"✅ Loaded image from: {item['url']}")
-                                else:
-                                    print(f"⚠️  Could not load image from: {item['url']}")
-                            elif item.get('type') == 'text':
-                                processed_content.append(item['text'])
-                        else:
-                            processed_content.append(str(item))
-                    
-                    # Create message with images if we have any
-                    if images:
-                        # For multimodal content, we need to pass images separately
-                        # and create a text-only message for the chat template
-                        text_content = ' '.join([str(item) for item in processed_content if isinstance(item, str)])
-                        if text_content:
-                            processed_messages.append({
-                                'role': role,
-                                'content': text_content
-                            })
-                        else:
-                            processed_messages.append({
-                                'role': role,
-                                'content': "Analyze these video frames for medical triage. Describe what you observe in the footage - visible injuries, consciousness level, breathing patterns, scene safety. Do NOT create fictional patient records. Base your assessment only on what you can see in the video frames."
-                            })
-                        
-                        # Store images for later processing
-                        self._current_images = images
-                    else:
-                        # Text-only content
-                        text_content = ' '.join([str(item) for item in processed_content if isinstance(item, str)])
-                        if text_content:
-                            processed_messages.append({
-                                'role': role,
-                                'content': text_content
-                            })
-                else:
-                    # Convert to string
-                    processed_messages.append({
-                        'role': role,
-                        'content': str(content)
-                    })
-            
-            print(f"🔊 Processed messages: {json.dumps(processed_messages, indent=2)}")
-            print(f"🔊 Number of processed messages: {len(processed_messages)}")
-            for i, msg in enumerate(processed_messages):
-                print(f"🔊 Message {i}: role={msg.get('role')}, content_type={type(msg.get('content'))}, content_length={len(str(msg.get('content')))}")
-            
-            # Add system prompt for consistent formatting if not already present
-            if not any(msg.get("role") == "system" for msg in processed_messages):
-                system_prompt = """You are analyzing video frames from a medical emergency scene. 
-
-IMPORTANT: You are NOT creating fictional patient records. You are analyzing actual video footage.
-
-CRITICAL OUTPUT FORMAT REQUIREMENTS:
-You MUST respond in exactly this format:
-**Triage: [RED/YELLOW/GREEN/BLACK]**
-**Reasoning:** [2-3 sentences explaining what you observe in the video frames]
-**Action:** [3-5 specific, actionable steps based on the visual evidence]
-
-TRIAGE CATEGORIES:
-- RED: Life-threatening, immediate intervention needed
-- YELLOW: Serious but stable, urgent care within 1 hour  
-- GREEN: Minor injuries, can wait for treatment
-- BLACK: Deceased or injuries incompatible with life
-
-FOCUS ON VISUAL EVIDENCE:
-- What you can actually see in the video frames
-- Visible injuries, bleeding, consciousness level
-- Breathing patterns, movement, scene safety
-- Do NOT invent patient information or medical history
-
-Keep reasoning concise and actions specific. Do not include any other text or formatting."""
-                
-                processed_messages = [{"role": "system", "content": system_prompt}] + processed_messages
-            
-            # Apply chat template
-            print(f"🔊 Applying chat template with {len(processed_messages)} messages")
+            # Apply chat template - let the processor handle images from messages
+            print(f"🔊 Applying chat template with messages")
             template_start = time.time()
-            
-            try:
-                # Try a simpler approach - just tokenize the last user message
-                last_user_message = None
-                for msg in reversed(processed_messages):
-                    if msg.get('role') == 'user':
-                        last_user_message = msg.get('content', '')
-                        break
-                
-                if not last_user_message:
-                    last_user_message = "Please provide a response."
-                
-                print(f"🔊 Using simplified tokenization for: {last_user_message[:100]}...")
-                
-                # Tokenize the message directly
-                input_ids = self.direct_processor(
-                    text=last_user_message,
-                    return_tensors="pt",
-                    add_special_tokens=True
-                )
-                
-            except Exception as template_error:
-                print(f"🔊 Tokenization error: {template_error}")
-                print(f"🔊 Last user message: {last_user_message}")
-                raise
+            input_ids = self.direct_processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt"
+            )
             template_time = time.time() - template_start
             print(f"🔊 Chat template applied in {template_time:.2f} seconds")
             
@@ -341,31 +219,14 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
             model_dtype = next(self.direct_model.parameters()).dtype
             input_ids = input_ids.to("cpu", dtype=model_dtype)
             print(f"🔊 Using model dtype: {model_dtype}")
-
-            # Handle images if present
-            if hasattr(self, '_current_images') and self._current_images:
-                print(f"🔊 Processing with {len(self._current_images)} images")
-                print(f"🔊 Image details: {[f'Size: {img.size}, Mode: {img.mode}' for img in self._current_images]}")
-                # For now, process as text-only (full multimodal support would require model-specific logic)
-                # TODO: Implement proper multimodal inference
-                print(f"🔊 WARNING: Images loaded but not used in inference (text-only mode)")
-                outputs = self.direct_model.generate(
-                    **input_ids, 
-                    max_new_tokens=256,
-                    do_sample=True,
-                    temperature=0.7
-                )
-                # Clear images after processing
-                self._current_images = []
-            else:
-                # Text-only generation
-                print(f"🔊 Processing text-only request")
-                outputs = self.direct_model.generate(
-                    **input_ids, 
-                    max_new_tokens=256,
-                    do_sample=True,
-                    temperature=0.7
-                )
+            
+            # Generate response
+            outputs = self.direct_model.generate(
+                **input_ids, 
+                max_new_tokens=256,
+                do_sample=True,
+                temperature=0.7
+            )
             
             # Decode response
             decoded_outputs = self.direct_processor.batch_decode(
@@ -507,13 +368,12 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
             analysis_time = time.time() - analysis_start
             print(f"🔊 Image analysis completed in {analysis_time:.2f} seconds")
             
-            # Clean up frame files (commented out for debugging)
-            # for frame_path in saved_frames:
-            #     try:
-            #         os.remove(frame_path)
-            #     except:
-            #         pass
-            print(f"🔊 Frame files preserved for debugging: {saved_frames}")
+            # Clean up frame files
+            for frame_path in saved_frames:
+                try:
+                    os.remove(frame_path)
+                except:
+                    pass
             
             end_time = time.time()
             inference_time = end_time - start_time
@@ -522,26 +382,11 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
             
             # Add video-specific metadata to the result
             if result['success']:
-                # Return in the format expected by the Flask app
-                return {
-                    'success': True,
-                    'response': result.get('response', ''),
-                    'description': result.get('response', ''),
-                    'frames_analyzed': len(frames),
-                    'total_frames': len(frames),
-                    'mode': 'video-direct',
-                    'confidence': 0.8,
-                    'triage_level': 'Yellow'  # Default, will be parsed from response
-                }
-            else:
-                return {
-                    'success': False,
-                    'error': result.get('error', 'Video analysis failed'),
-                    'description': result.get('error', 'Video analysis failed'),
-                    'confidence': 0.0,
-                    'triage_level': 'Unknown',
-                    'mode': 'video-direct'
-                }
+                result['frames_analyzed'] = len(frames)
+                result['total_frames'] = len(frames)
+                result['mode'] = 'video-direct'
+            
+            return result
             
         except Exception as e:
             import traceback
@@ -553,7 +398,7 @@ Keep reasoning concise and actions specific. Do not include any other text or fo
                 'mode': 'video-direct'
             }
     
-    def _extract_video_frames(self, video_path: str, max_frames: int = 1) -> List[Image.Image]:
+    def _extract_video_frames(self, video_path: str, max_frames: int = 3) -> List[Image.Image]:
         """
         Extract frames from video file
         

@@ -143,9 +143,6 @@ class ModelManagerAPI:
                 'mode': 'api-image'
             }
         except Exception as e:
-            import traceback
-            error_details = f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}"
-            print(f"🔊 API Image Error: {error_details}")
             return {
                 'success': False,
                 'error': str(e),
@@ -266,9 +263,6 @@ class ModelManagerAPI:
                 'mode': 'api-video'
             }
         except Exception as e:
-            import traceback
-            error_details = f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}"
-            print(f"🔊 API Video Error: {error_details}")
             return {
                 'success': False,
                 'error': str(e),

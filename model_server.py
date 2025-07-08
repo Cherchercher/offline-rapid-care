@@ -55,7 +55,6 @@ def chat_image():
         messages = data.get('messages', [])
         
         print(f"📨 Received image chat request with {len(messages)} messages")
-        print(f"📨 Message structure: {json.dumps(messages, indent=2)}")
         
         # Use model manager for image request
         print(f"📤 Sending image request to model manager...")

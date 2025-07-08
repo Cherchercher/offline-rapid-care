@@ -780,7 +780,7 @@ def switch_model_mode():
         
         return jsonify({
             'success': True,
-            'new_mode': 'api',
+            'new_mode': model_manager.mode,
             'status': model_manager.get_status()
         })
         
@@ -798,7 +798,7 @@ def log_interaction(role, user_message, assistant_message, patient_id=None):
         'user_message': user_message,
         'assistant_message': assistant_message,
         'patient_id': patient_id,
-        'model_mode': 'api'
+        'model_mode': model_manager.mode
     }
     
     # In production, save to database
