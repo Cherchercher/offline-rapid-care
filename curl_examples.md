@@ -37,12 +37,12 @@ curl -X POST http://localhost:5001/chat/image \
 
 ## Video Analysis (Placeholder)
 ```bash
-curl -X POST http://localhost:5001/chat/video \
+curl -X POST http://localhost:5001/chat/image \
   -H "Content-Type: application/json" \
   -d '{
     "messages": [
       {"role": "user", "content": [
-        {"type": "video", "path": "/path/to/video.mp4"},
+        {"type": "video", "path": "./uploads/coming_out_of_fire.mp4"},
         {"type": "text", "text": "Analyze this video for medical triage assessment."}
       ]}
     ]

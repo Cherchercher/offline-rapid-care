@@ -4,6 +4,8 @@ import requests
 from PIL import Image
 from io import BytesIO
 import json
+import io
+import base64
 from typing import Dict, List, Optional
 import time
 import os
@@ -64,16 +66,24 @@ class ModelManagerPipeline:
             raise
     
     def _load_image_from_url(self, url: str) -> Optional[Image.Image]:
-        """Load image from URL"""
+        """Load image from URL or local path"""
         try:
-            print(f"🔊 Loading image from URL: {url}")
+            print(f"🔊 Loading image from URL/path: {url}")
+            
+            # Check if it's a local file path
+            if os.path.exists(url):
+                img = Image.open(url).convert("RGB")
+                print(f"🔊 Successfully loaded local image: {img.size}")
+                return img
+            
+            # Otherwise treat as URL
             response = requests.get(url, timeout=15)
             response.raise_for_status()
             img = Image.open(BytesIO(response.content)).convert("RGB")
-            print(f"🔊 Successfully loaded image: {img.size}")
+            print(f"🔊 Successfully loaded image from URL: {img.size}")
             return img
         except Exception as e:
-            print(f"🔊 Error loading image from URL {url}: {e}")
+            print(f"🔊 Error loading image from URL/path {url}: {e}")
             return None
     
     def chat_text(self, messages: List[Dict]) -> Dict:
@@ -192,39 +202,15 @@ class ModelManagerPipeline:
             
             start_time = time.time()
             
-            # Extract images from messages
-            pipeline_images = []
-            for msg in messages:
-                if isinstance(msg.get("content"), list):
-                    for item in msg["content"]:
-                        if isinstance(item, dict) and item.get("type") == "image":
-                            if "url" in item:
-                                pil_img = self._load_image_from_url(item["url"])
-                                if pil_img:
-                                    pipeline_images.append(pil_img)
-                            elif "path" in item:
-                                pipeline_images.append(Image.open(item["path"]).convert("RGB"))
-            
-            # Apply chat template with or without images
-            if pipeline_images:
-                print(f"🔊 Using {len(pipeline_images)} images with chat template")
-                input_ids = self.direct_processor.apply_chat_template(
-                    messages,
-                    images=pipeline_images,
-                    add_generation_prompt=True,
-                    tokenize=True,
-                    return_dict=True,
-                    return_tensors="pt"
-                )
-            else:
-                print(f"🔊 No images found, using text-only chat template")
-                input_ids = self.direct_processor.apply_chat_template(
-                    messages,
-                    add_generation_prompt=True,
-                    tokenize=True,
-                    return_dict=True,
-                    return_tensors="pt"
-                )
+            # Apply chat template - let the processor handle images from messages
+            print(f"🔊 Applying chat template with messages")
+            input_ids = self.direct_processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt"
+            )
             
             # Move to CPU with the same dtype as the model
             model_dtype = next(self.direct_model.parameters()).dtype
@@ -287,7 +273,7 @@ class ModelManagerPipeline:
     
     def chat_video(self, messages: List[Dict]) -> Dict:
         """
-        Send video analysis request (placeholder for future implementation)
+        Send video analysis request using frame extraction and image analysis
         
         Args:
             messages: List of message dictionaries (video path should be embedded in messages)
@@ -295,11 +281,177 @@ class ModelManagerPipeline:
         Returns:
             Dictionary with response and metadata
         """
-        return {
-            'success': False,
-            'error': 'Video analysis not yet implemented',
-            'mode': 'video-pipeline'
-        }
+        try:
+            # Extract video path from messages
+            video_path = None
+            for msg in messages:
+                if isinstance(msg.get("content"), list):
+                    for item in msg["content"]:
+                        if isinstance(item, dict) and item.get("type") == "video":
+                            video_path = item.get("path")
+                            break
+            
+            if not video_path:
+                return {
+                    'success': False,
+                    'error': 'No video path found in messages',
+                    'mode': 'video-direct'
+                }
+            
+            print(f"🔊 Video analysis request:")
+            print(f"   Video path: {video_path}")
+            
+            # Check if video file exists
+            if not os.path.exists(video_path):
+                return {
+                    'success': False,
+                    'error': f'Video file not found: {video_path}',
+                    'mode': 'video-direct'
+                }
+            
+            start_time = time.time()
+            
+            # Extract frames from video
+            frames = self._extract_video_frames(video_path)
+            
+            if not frames:
+                return {
+                    'success': False,
+                    'error': 'No frames extracted from video',
+                    'mode': 'video-direct'
+                }
+            
+            print(f"🔊 Extracted {len(frames)} frames from video")
+            
+            # Create a single message with all frames
+            print(f"🔊 Creating video analysis message with {len(frames)} frames")
+            
+            # Save frames and create content list
+            content = []
+            saved_frames = []
+            
+            for i, frame in enumerate(frames):
+                # Save frame to uploads directory
+                timestamp = int(time.time() * 1000)
+                frame_filename = f"video_frame_{timestamp}_{i}.jpg"
+                frame_path = os.path.join("uploads", frame_filename)
+                frame.save(frame_path, format='JPEG')
+                saved_frames.append(frame_path)
+                
+                # Add frame to content
+                content.append({"type": "image", "url": frame_path})
+            
+            # Add text prompt
+            content.append({"type": "text", "text": "Analyze these video frames for medical triage assessment."})
+            
+            # Create single message with all frames
+            video_messages = [
+                {
+                    "role": "user",
+                    "content": content
+                }
+            ]
+            
+            # Use the same image analysis method (which now handles multiple images)
+            result = self.chat_image(video_messages)
+            
+            # Clean up frame files
+            for frame_path in saved_frames:
+                try:
+                    os.remove(frame_path)
+                except:
+                    pass
+            
+            end_time = time.time()
+            inference_time = end_time - start_time
+            
+            print(f"🔊 Video analysis completed in {inference_time:.2f} seconds")
+            
+            # Add video-specific metadata to the result
+            if result['success']:
+                result['frames_analyzed'] = len(frames)
+                result['total_frames'] = len(frames)
+                result['mode'] = 'video-direct'
+            
+            return result
+            
+        except Exception as e:
+            import traceback
+            print(f"🔊 Video analysis error: {e}")
+            print(f"🔊 Full traceback: {traceback.format_exc()}")
+            return {
+                'success': False,
+                'error': str(e),
+                'mode': 'video-direct'
+            }
+    
+    def _extract_video_frames(self, video_path: str, max_frames: int = 5) -> List[Image.Image]:
+        """
+        Extract frames from video file
+        
+        Args:
+            video_path: Path to video file
+            max_frames: Maximum number of frames to extract
+        
+        Returns:
+            List of PIL Images
+        """
+        try:
+            import cv2
+            
+            # Open video file
+            cap = cv2.VideoCapture(video_path)
+            
+            if not cap.isOpened():
+                print(f"❌ Could not open video file: {video_path}")
+                return []
+            
+            # Get video properties
+            total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            fps = cap.get(cv2.CAP_PROP_FPS)
+            duration = total_frames / fps if fps > 0 else 0
+            
+            print(f"🔊 Video info: {total_frames} frames, {fps:.2f} fps, {duration:.2f}s duration")
+            
+            # Calculate frame intervals to extract
+            if total_frames <= max_frames:
+                frame_indices = list(range(total_frames))
+            else:
+                # Extract frames evenly distributed throughout the video
+                step = total_frames // max_frames
+                frame_indices = [i * step for i in range(max_frames)]
+            
+            frames = []
+            for frame_idx in frame_indices:
+                # Set frame position
+                cap.set(cv2.CAP_PROP_POS_FRAMES, frame_idx)
+                
+                # Read frame
+                ret, frame = cap.read()
+                if ret:
+                    # Convert BGR to RGB
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    
+                    # Convert to PIL Image
+                    pil_image = Image.fromarray(frame_rgb)
+                    
+                    frames.append(pil_image)
+                    print(f"🔊 Extracted frame {frame_idx + 1}/{total_frames}")
+                else:
+                    print(f"⚠️  Failed to read frame {frame_idx}")
+            
+            # Release video capture
+            cap.release()
+            
+            print(f"🔊 Successfully extracted {len(frames)} frames")
+            return frames
+            
+        except ImportError:
+            print("❌ OpenCV not available. Install with: pip install opencv-python")
+            return []
+        except Exception as e:
+            print(f"❌ Error extracting video frames: {e}")
+            return []
     
     def chat_audio(self, messages: List[Dict]) -> Dict:
         """

@@ -209,6 +209,66 @@ class ModelManagerAPI:
                 'mode': 'api-audio'
             }
     
+    def chat_video(self, messages: List[Dict]) -> Dict:
+        """
+        Send video analysis request to model API server
+        
+        Args:
+            messages: List of message dictionaries (video path should be embedded in messages)
+        
+        Returns:
+            Dictionary with response and metadata
+        """
+        try:
+            print(f"🔗 API Model Manager: Attempting to connect to {self.api_url}")
+            
+            # Check server health first
+            if not self._check_server_health():
+                print(f"❌ API Model Manager: Server health check failed")
+                return {
+                    'success': False,
+                    'error': 'Model API server is not available',
+                    'mode': 'api'
+                }
+            
+            print(f"✅ API Model Manager: Server health check passed")
+            
+            # Prepare request payload
+            payload = {
+                'messages': messages
+            }
+            
+            # Send request to video endpoint
+            response = requests.post(
+                f"{self.api_url}/chat/video",
+                json=payload,
+                timeout=300  # 5 minutes for video processing (frame extraction + analysis)
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                result['mode'] = 'api-video'
+                return result
+            else:
+                return {
+                    'success': False,
+                    'error': f'API server error: {response.status_code}',
+                    'mode': 'api-video'
+                }
+                
+        except requests.exceptions.Timeout:
+            return {
+                'success': False,
+                'error': 'Request timeout - video analysis took too long',
+                'mode': 'api-video'
+            }
+        except Exception as e:
+            return {
+                'success': False,
+                'error': str(e),
+                'mode': 'api-video'
+            }
+    
     def transcribe_audio_file(self, audio_file_path: str, prompt: str = "Transcribe this audio accurately") -> Dict:
         """
         Transcribe audio file using the new API architecture
