@@ -780,13 +780,31 @@ class RapidCareApp {
                 
                 ${imagePreview}
                 
+                <div class="patient-info">
+                    <h5>Patient Information:</h5>
+                    <div class="info-grid">
+                        <div class="info-item">
+                            <strong>Age:</strong> ${triageData.patientInfo.age}
+                        </div>
+                        <div class="info-item">
+                            <strong>Gender:</strong> ${triageData.patientInfo.gender}
+                        </div>
+                        <div class="info-item">
+                            <strong>Mechanism of Injury:</strong> ${triageData.patientInfo.mechanism}
+                        </div>
+                        <div class="info-item full-width">
+                            <strong>Assessment Findings:</strong> ${triageData.patientInfo.assessment}
+                        </div>
+                    </div>
+                </div>
+                
                 <div class="triage-reasoning">
-                    <h5>Assessment:</h5>
+                    <h5>Reasoning:</h5>
                     <p>${triageData.reasoning}</p>
                 </div>
                 
                 <div class="triage-actions">
-                    <h5>Recommended Actions:</h5>
+                    <h5>Immediate Actions:</h5>
                     <ul>
                         ${triageData.actions.map(action => `<li>${action}</li>`).join('')}
                     </ul>
@@ -867,15 +885,30 @@ class RapidCareApp {
             return {
                 level: 'Yellow',
                 reasoning: 'Unable to parse analysis. Please review manually.',
-                actions: ['Assess patient condition manually', 'Follow standard protocols']
+                actions: ['Assess patient condition manually', 'Follow standard protocols'],
+                patientInfo: {
+                    age: 'Unknown',
+                    gender: 'Unknown',
+                    mechanism: 'Unknown',
+                    assessment: 'Unable to parse assessment findings'
+                }
             };
         }
 
-        // Extract triage level - flexible pattern matching
+        // Initialize structured data
         let level = 'Yellow'; // Default fallback
-        
-        // Try multiple patterns for triage level
+        let reasoning = 'Assessment completed based on visual analysis';
+        let actions = ['Follow standard protocols'];
+        let patientInfo = {
+            age: 'Unknown',
+            gender: 'Unknown',
+            mechanism: 'Unknown',
+            assessment: 'Unable to parse assessment findings'
+        };
+
+        // Extract triage level - enhanced pattern matching for new format
         const triagePatterns = [
+            /\*\*TRIAGE LEVEL:\*\*\s*(RED|YELLOW|GREEN|BLACK)/i,
             /\*\*Triage:\s*(RED|YELLOW|GREEN|BLACK)\*\*/i,
             /Triage:\s*(RED|YELLOW|GREEN|BLACK)/i,
             /Triage Level:\s*(RED|YELLOW|GREEN|BLACK)/i,
@@ -895,10 +928,15 @@ class RapidCareApp {
         if (level === 'Yellow') {
             const text = response.toLowerCase();
             
-            // Red indicators
+            // Red indicators - enhanced for medical assessment language
             if (text.includes('red') || text.includes('immediate') || text.includes('critical') || 
                 text.includes('life-threatening') || text.includes('severe trauma') || 
-                text.includes('highest priority') || text.includes('emergency')) {
+                text.includes('highest priority') || text.includes('emergency') ||
+                text.includes('immediate life-threatening') || text.includes('airway') ||
+                text.includes('breathing') || text.includes('circulation') ||
+                text.includes('facial injuries') || text.includes('smoke inhalation') ||
+                text.includes('burns') || text.includes('significant') ||
+                text.includes('dangerous environment') || text.includes('fire')) {
                 level = 'Red';
             }
             // Black indicators
@@ -918,11 +956,9 @@ class RapidCareApp {
             }
         }
 
-        // Extract reasoning - flexible content extraction
-        let reasoning = 'Assessment completed based on visual analysis';
-        
-        // Try to find reasoning section
+        // Extract reasoning - enhanced for new format and natural language
         const reasoningPatterns = [
+            /\*\*REASONING:\*\*\s*([\s\S]*?)(?=\*\*PATIENT INFORMATION:\*\*|\*\*Action:\*\*|\*\*Actions:\*\*|\*\*Recommendations:\*\*|$)/i,
             /\*\*Reasoning:\*\*\s*([\s\S]*?)(?=\*\*Action:\*\*|\*\*Actions:\*\*|\*\*Recommendations:\*\*|$)/i,
             /Reasoning:\s*([\s\S]*?)(?=Action:|Actions:|Recommendations:|$)/i,
             /Assessment:\s*([\s\S]*?)(?=Action:|Actions:|Recommendations:|$)/i,
@@ -937,34 +973,132 @@ class RapidCareApp {
             }
         }
         
-        // If no reasoning section found, extract meaningful content
+        // If no structured reasoning found, extract the first descriptive paragraph
         if (reasoning === 'Assessment completed based on visual analysis') {
-            // Split into paragraphs and find the most descriptive one
             const paragraphs = response.split('\n\n').filter(p => p.trim() && p.length > 50);
             if (paragraphs.length > 0) {
-                // Find the paragraph with the most medical/assessment keywords
-                const medicalKeywords = ['patient', 'injury', 'trauma', 'condition', 'assessment', 'medical', 'treatment', 'symptoms'];
-                let bestParagraph = paragraphs[0];
-                let maxKeywords = 0;
+                // Find the paragraph that describes the situation
+                const descriptiveParagraphs = paragraphs.filter(p => 
+                    p.toLowerCase().includes('video') || 
+                    p.toLowerCase().includes('frames') || 
+                    p.toLowerCase().includes('patient') ||
+                    p.toLowerCase().includes('man') ||
+                    p.toLowerCase().includes('woman') ||
+                    p.toLowerCase().includes('person')
+                );
                 
-                for (const paragraph of paragraphs) {
-                    const keywordCount = medicalKeywords.filter(keyword => 
-                        paragraph.toLowerCase().includes(keyword)
-                    ).length;
-                    if (keywordCount > maxKeywords) {
-                        maxKeywords = keywordCount;
-                        bestParagraph = paragraph;
-                    }
+                if (descriptiveParagraphs.length > 0) {
+                    reasoning = descriptiveParagraphs[0].trim();
+                } else {
+                    reasoning = paragraphs[0].trim();
                 }
-                reasoning = bestParagraph.trim();
             }
         }
 
-        // Extract actions - flexible action extraction
-        let actions = ['Follow standard protocols'];
+        // Extract patient information - new structured format
+        const patientInfoSection = response.match(/\*\*PATIENT INFORMATION:\*\*([\s\S]*?)(?=\*\*TRIAGE CATEGORY DETAILS:\*\*|\*\*IMMEDIATE ACTIONS:\*\*|$)/i);
+        if (patientInfoSection) {
+            const patientText = patientInfoSection[1];
+            
+            // Extract age
+            const ageMatch = patientText.match(/\*\*Approximate Age:\*\*\s*([^\n]+)/i) || 
+                           patientText.match(/Approximate Age:\s*([^\n]+)/i);
+            if (ageMatch) {
+                patientInfo.age = ageMatch[1].trim();
+            }
+            
+            // Extract gender
+            const genderMatch = patientText.match(/\*\*Gender:\*\*\s*([^\n]+)/i) || 
+                              patientText.match(/Gender:\s*([^\n]+)/i);
+            if (genderMatch) {
+                patientInfo.gender = genderMatch[1].trim();
+            }
+            
+            // Extract mechanism of injury
+            const mechanismMatch = patientText.match(/\*\*Mechanism of Injury:\*\*\s*([^\n]+)/i) || 
+                                 patientText.match(/Mechanism of Injury:\s*([^\n]+)/i);
+            if (mechanismMatch) {
+                patientInfo.mechanism = mechanismMatch[1].trim();
+            }
+            
+            // Extract assessment findings
+            const assessmentMatch = patientText.match(/\*\*Brief Assessment Findings:\*\*\s*([^\n]+)/i) || 
+                                  patientText.match(/Brief Assessment Findings:\s*([^\n]+)/i);
+            if (assessmentMatch) {
+                patientInfo.assessment = assessmentMatch[1].trim();
+            }
+        }
         
-        // Try to find actions section
+        // If no structured patient info found, try to extract from general text
+        if (patientInfo.age === 'Unknown') {
+            const agePatterns = [
+                /(\d+)\s*(?:years?\s*old|y\.?o\.?)/i,
+                /age[:\s]*(\d+)/i,
+                /(\d+)\s*(?:year|yr)/i
+            ];
+            for (const pattern of agePatterns) {
+                const match = response.match(pattern);
+                if (match) {
+                    patientInfo.age = `${match[1]} years`;
+                    break;
+                }
+            }
+        }
+        
+        if (patientInfo.gender === 'Unknown') {
+            const genderPatterns = [
+                /(male|female|man|woman|boy|girl)/i
+            ];
+            for (const pattern of genderPatterns) {
+                const match = response.match(pattern);
+                if (match) {
+                    patientInfo.gender = match[1].toLowerCase();
+                    break;
+                }
+            }
+        }
+        
+        // Extract mechanism of injury from natural language
+        if (patientInfo.mechanism === 'Unknown') {
+            const mechanismPatterns = [
+                /(motor vehicle accident|car crash|car accident)/i,
+                /(fall|fell|falling)/i,
+                /(fire|burn|smoke)/i,
+                /(trauma|injury|injured)/i,
+                /(medical emergency|medical condition)/i
+            ];
+            for (const pattern of mechanismPatterns) {
+                const match = response.match(pattern);
+                if (match) {
+                    patientInfo.mechanism = match[1].toLowerCase();
+                    break;
+                }
+            }
+        }
+        
+        // Extract assessment findings from natural language
+        if (patientInfo.assessment === 'Unable to parse assessment findings') {
+            const assessmentKeywords = [
+                'facial injuries', 'bleeding', 'conscious', 'unconscious', 
+                'breathing', 'airway', 'smoke inhalation', 'burns', 'fractures'
+            ];
+            
+            const sentences = response.split(/[.!?]+/).filter(s => s.trim().length > 20);
+            const assessmentSentences = sentences.filter(sentence => 
+                assessmentKeywords.some(keyword => sentence.toLowerCase().includes(keyword))
+            );
+            
+            if (assessmentSentences.length > 0) {
+                patientInfo.assessment = assessmentSentences[0].trim();
+            } else if (sentences.length > 0) {
+                // Use the first descriptive sentence
+                patientInfo.assessment = sentences[0].trim();
+            }
+        }
+
+        // Extract actions - enhanced for new format
         const actionPatterns = [
+            /\*\*IMMEDIATE ACTIONS:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
             /\*\*Action:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
             /\*\*Actions:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
             /\*\*Recommendations:\*\*\s*([\s\S]*?)(?=\n\n|$)/i,
@@ -1020,10 +1154,28 @@ class RapidCareApp {
                     actions = recommendations.slice(0, 4).map(s => s.trim());
                 }
             }
+            
+            // Enhanced extraction for medical assessment format
+            if (actions.length === 1 && actions[0] === 'Follow standard protocols') {
+                // Look for medical assessment sections
+                const medicalSections = response.split(/\*\*[^*]+\*\*/);
+                for (const section of medicalSections) {
+                    if (section.toLowerCase().includes('immediate') || 
+                        section.toLowerCase().includes('medical') ||
+                        section.toLowerCase().includes('needs')) {
+                        
+                        const lines = section.split('\n').filter(line => line.trim() && line.includes(':'));
+                        if (lines.length > 0) {
+                            actions = lines.slice(0, 5).map(line => line.trim());
+                            break;
+                        }
+                    }
+                }
+            }
         }
 
-        console.log('Parsed triage data:', { level, reasoning, actions });
-        return { level, reasoning, actions };
+        console.log('Parsed triage data:', { level, reasoning, actions, patientInfo });
+        return { level, reasoning, actions, patientInfo };
     }
 
     createPatientFromTriage(triageLevel, reasoning) {

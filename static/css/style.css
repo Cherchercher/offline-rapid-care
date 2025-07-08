@@ -1310,6 +1310,40 @@ body {
     opacity: 0.9;
 }
 
+.patient-info {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8fafc;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.patient-info h5 {
+    color: #1f2937;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+}
+
+.info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+}
+
+.info-item {
+    padding: 8px 0;
+    color: #4b5563;
+}
+
+.info-item.full-width {
+    grid-column: 1 / -1;
+}
+
+.info-item strong {
+    color: #1f2937;
+    font-weight: 600;
+}
+
 .triage-reasoning, .triage-actions {
     margin-bottom: 20px;
 }
