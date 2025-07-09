@@ -174,6 +174,25 @@ class DatabaseManager:
             )
         """)
         
+        # Vitals table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS vitals (
+                id TEXT PRIMARY KEY,
+                patient_id TEXT NOT NULL,
+                heart_rate INTEGER,
+                bp_sys INTEGER,
+                bp_dia INTEGER,
+                resp_rate INTEGER,
+                o2_sat REAL,
+                temperature REAL,
+                pain_score INTEGER,
+                timestamp TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                created_by TEXT,
+                FOREIGN KEY (patient_id) REFERENCES patients (id)
+            )
+        """)
+        
         # Create indexes
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_patients_sync_status ON patients(sync_status)")
         cursor.execute("CREATE INDEX IF NOT EXISTS idx_soap_notes_patient_id ON soap_notes(patient_id)")
@@ -283,6 +302,25 @@ class DatabaseManager:
                     status VARCHAR(50) DEFAULT 'missing',
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
+                )
+            """)
+            
+            # Vitals table
+            cursor.execute("""
+                CREATE TABLE IF NOT EXISTS vitals (
+                    id VARCHAR(255) PRIMARY KEY,
+                    patient_id VARCHAR(255) NOT NULL,
+                    heart_rate INTEGER,
+                    bp_sys INTEGER,
+                    bp_dia INTEGER,
+                    resp_rate INTEGER,
+                    o2_sat REAL,
+                    temperature REAL,
+                    pain_score INTEGER,
+                    timestamp TIMESTAMP WITH TIME ZONE NOT NULL,
+                    created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+                    created_by VARCHAR(255),
+                    FOREIGN KEY (patient_id) REFERENCES patients (id)
                 )
             """)
             
@@ -1006,6 +1044,27 @@ class DatabaseManager:
                         data['role'],
                         data['timestamp']
                     ))
+                
+                elif table_name == 'vitals':
+                    conn.execute("""
+                        INSERT INTO vitals 
+                        (id, patient_id, heart_rate, bp_sys, bp_dia, resp_rate, o2_sat, temperature, pain_score, timestamp, created_at, created_by)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO NOTHING
+                    """, (
+                        data['id'],
+                        data['patient_id'],
+                        data['heart_rate'],
+                        data['bp_sys'],
+                        data['bp_dia'],
+                        data['resp_rate'],
+                        data['o2_sat'],
+                        data['temperature'],
+                        data['pain_score'],
+                        data['timestamp'],
+                        data['created_at'],
+                        data['created_by']
+                    ))
             
             conn.close()
             
@@ -1146,6 +1205,61 @@ class DatabaseManager:
                 'error': str(e)
             }
 
+    def add_vitals(self, vitals_data: Dict) -> str:
+        """Add a new vitals record for a patient"""
+        vitals_id = str(uuid.uuid4())
+        now = datetime.now(timezone.utc).isoformat()
+        record = {
+            'id': vitals_id,
+            'patient_id': vitals_data['patient_id'],
+            'heart_rate': vitals_data.get('heart_rate'),
+            'bp_sys': vitals_data.get('bp_sys'),
+            'bp_dia': vitals_data.get('bp_dia'),
+            'resp_rate': vitals_data.get('resp_rate'),
+            'o2_sat': vitals_data.get('o2_sat'),
+            'temperature': vitals_data.get('temperature'),
+            'pain_score': vitals_data.get('pain_score'),
+            'timestamp': vitals_data.get('timestamp', now),
+            'created_at': now,
+            'created_by': vitals_data.get('created_by', 'PARAMEDIC')
+        }
+        try:
+            conn = self.get_sqlite_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO vitals (id, patient_id, heart_rate, bp_sys, bp_dia, resp_rate, o2_sat, temperature, pain_score, timestamp, created_at, created_by)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                record['id'], record['patient_id'], record['heart_rate'], record['bp_sys'], record['bp_dia'],
+                record['resp_rate'], record['o2_sat'], record['temperature'], record['pain_score'],
+                record['timestamp'], record['created_at'], record['created_by']
+            ))
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.error(f"❌ Failed to add vitals: {e}")
+            raise
+        # Optionally sync to PostgreSQL if online
+        if self.online_available and self.sync_enabled:
+            self._sync_to_postgresql('vitals', record, 'INSERT')
+        return vitals_id
+    def get_vitals(self, patient_id: str) -> List[Dict]:
+        """Get all vitals for a patient, ordered by timestamp desc"""
+        try:
+            conn = self.get_sqlite_connection()
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT * FROM vitals WHERE patient_id = ? ORDER BY timestamp DESC
+            """, (patient_id,))
+            rows = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
+            vitals = [dict(zip(columns, row)) for row in rows]
+            conn.close()
+            return vitals
+        except Exception as e:
+            logger.error(f"❌ Failed to get vitals: {e}")
+            return []
+
 # Global database manager instance
 db_manager = None
 
@@ -1207,6 +1321,26 @@ if __name__ == "__main__":
         
         updated = db.update_soap_note(soap_id, updated_soap_data)
         print(f"✅ SOAP note updated: {updated}")
+        
+        # Test adding vitals
+        vitals_data = {
+            'patient_id': patient_id,
+            'heart_rate': 80,
+            'bp_sys': 120,
+            'bp_dia': 80,
+            'resp_rate': 18,
+            'o2_sat': 98.5,
+            'temperature': 36.8,
+            'pain_score': 5,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'created_by': 'Dr. Jones'
+        }
+        vitals_id = db.add_vitals(vitals_data)
+        print(f"✅ Vitals added: {vitals_id}")
+
+        # Test getting vitals
+        vitals_records = db.get_vitals(patient_id)
+        print(f"✅ Retrieved {len(vitals_records)} vitals records")
         
         # Test sync status
         sync_status = db.get_sync_status()

@@ -1027,6 +1027,32 @@ def transcribe_audio():
             'error': str(e)
         }), 500
 
+@app.route('/api/vitals', methods=['GET', 'POST'])
+def vitals_api():
+    """Handle vitals operations"""
+    try:
+        if request.method == 'GET':
+            patient_id = request.args.get('patient_id')
+            if not patient_id:
+                return jsonify({'success': False, 'error': 'patient_id required'}), 400
+            vitals = db_manager.get_vitals(patient_id)
+            return jsonify({'success': True, 'vitals': vitals})
+        elif request.method == 'POST':
+            data = request.json
+            try:
+                vitals_id = db_manager.add_vitals(data)
+            except Exception as e:
+                import traceback
+                print('--- Exception in add_vitals ---')
+                traceback.print_exc()
+                return jsonify({'success': False, 'error': str(e)}), 500
+            return jsonify({'success': True, 'vitals_id': vitals_id, 'message': 'Vitals added successfully'})
+    except Exception as e:
+        import traceback
+        print('--- Exception in /api/vitals ---')
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 if __name__ == '__main__':
     # For development, you can use a self-signed certificate
     # In production, use a proper SSL certificate

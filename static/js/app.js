@@ -166,9 +166,70 @@ class RapidCareApp {
             this.startVoiceInput('soap-plan');
         });
 
+        // Vitals form submit
+        document.getElementById('vitals-form').addEventListener('submit', (e) => this.handleVitalsSubmit(e));
+        // Voice input for each vitals field
+        const vitalsVoiceFields = [
+            { btn: 'vitals-heart-rate-voice-btn', field: 'vitals-heart-rate' },
+            { btn: 'vitals-bp-voice-btn', field: 'vitals-bp-sys' },
+            { btn: 'vitals-resp-rate-voice-btn', field: 'vitals-resp-rate' },
+            { btn: 'vitals-o2-sat-voice-btn', field: 'vitals-o2-sat' },
+            { btn: 'vitals-temperature-voice-btn', field: 'vitals-temperature' },
+            { btn: 'vitals-pain-score-voice-btn', field: 'vitals-pain-score' }
+        ];
+        vitalsVoiceFields.forEach(({btn, field}) => {
+            const button = document.getElementById(btn);
+            if (button) {
+                button.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    this.startVoiceInput(field);
+                });
+            }
+        });
+
         // Online/offline events
         window.addEventListener('online', () => this.handleOnline());
         window.addEventListener('offline', () => this.handleOffline());
+
+        // Delegated event listener for create patient button (handles dynamically created buttons)
+        document.addEventListener('click', (e) => {
+            if (e.target.closest('#create-patient-btn')) {
+                const button = e.target.closest('#create-patient-btn');
+                const triageLevel = button.dataset.triageLevel;
+                const reasoning = decodeURIComponent(button.dataset.reasoning);
+                console.log('Create patient button clicked:', { triageLevel, reasoning });
+                try {
+                    this.createPatientFromTriage(triageLevel, reasoning);
+                } catch (error) {
+                    console.error('Error in createPatientFromTriage:', error);
+                    this.addSystemMessage(`Error creating patient: ${error.message}`);
+                }
+            }
+        });
+
+        // Delegated event listener for paramedic patient card click in recent patients
+        document.getElementById('patients-list').addEventListener('click', (e) => {
+            if (this.currentRole === 'PARAMEDIC') {
+                const card = e.target.closest('.patient-card');
+                if (card && card.hasAttribute('data-patient-id')) {
+                    const patientId = card.getAttribute('data-patient-id');
+                    this.openVitalsModal(patientId);
+                }
+            }
+        });
+        // Delegated event listener for paramedic patient card click in all patients modal
+        const allPatientsList = document.getElementById('all-patients-list');
+        if (allPatientsList) {
+            allPatientsList.addEventListener('click', (e) => {
+                if (this.currentRole === 'PARAMEDIC') {
+                    const card = e.target.closest('.patient-card');
+                    if (card && card.hasAttribute('data-patient-id')) {
+                        const patientId = card.getAttribute('data-patient-id');
+                        this.openVitalsModal(patientId);
+                    }
+                }
+            });
+        }
     }
 
     handleRoleSelection(event) {
@@ -811,7 +872,7 @@ class RapidCareApp {
                 </div>
                 
                 <div class="triage-buttons">
-                    <button class="btn-primary" onclick="app.createPatientFromTriage('${triageData.level}', '${triageData.reasoning.replace(/'/g, "\\'")}')">
+                    <button class="btn-primary" id="create-patient-btn" data-triage-level="${triageData.level}" data-reasoning="${encodeURIComponent(triageData.reasoning)}">
                         <i class="fas fa-user-plus"></i>
                         Create Patient
                     </button>
@@ -1179,33 +1240,46 @@ class RapidCareApp {
     }
 
     createPatientFromTriage(triageLevel, reasoning) {
-        this.closeModal(document.getElementById('triage-modal'));
-        this.openPatientModal();
+        console.log('createPatientFromTriage called with:', { triageLevel, reasoning });
         
-        // Pre-fill form with triage data
-        const triageField = document.getElementById('triage-level');
-        const notesField = document.getElementById('patient-notes');
-        
-        console.log('Setting triage level:', triageLevel, 'Field found:', !!triageField);
-        console.log('Setting notes:', reasoning, 'Field found:', !!notesField);
-        
-        if (triageField && triageLevel) {
-            // Normalize to "Red", "Yellow", etc.
-            const normalized = triageLevel.charAt(0).toUpperCase() + triageLevel.slice(1).toLowerCase();
-            triageField.value = normalized;
-            console.log('Triage level set to:', triageField.value);
+        try {
+            this.closeModal(document.getElementById('triage-modal'));
+            console.log('Triage modal closed');
+            
+            this.openPatientModal();
+            console.log('Patient modal opened');
+            
+            // Pre-fill form with triage data
+            const triageField = document.getElementById('triage-level');
+            const notesField = document.getElementById('patient-notes');
+            
+            console.log('Setting triage level:', triageLevel, 'Field found:', !!triageField);
+            console.log('Setting notes:', reasoning, 'Field found:', !!notesField);
+            
+            if (triageField && triageLevel) {
+                // Normalize to "Red", "Yellow", etc.
+                const normalized = triageLevel.charAt(0).toUpperCase() + triageLevel.slice(1).toLowerCase();
+                triageField.value = normalized;
+                console.log('Triage level set to:', triageField.value);
+            }
+            
+            if (notesField) {
+                notesField.value = `Triage Assessment: ${reasoning}`;
+                console.log('Notes set to:', notesField.value);
+            }
+            
+            this.addSystemMessage('Patient form opened with triage data');
+            console.log('createPatientFromTriage completed successfully');
+        } catch (error) {
+            console.error('Error in createPatientFromTriage:', error);
+            this.addSystemMessage(`Error opening patient form: ${error.message}`);
+            throw error;
         }
-        
-        if (notesField) {
-            notesField.value = `Triage Assessment: ${reasoning}`;
-            console.log('Notes set to:', notesField.value);
-        }
-        
-        this.addSystemMessage('Patient form opened with triage data');
     }
 
     async handlePatientSubmit(event) {
         event.preventDefault();
+        console.log('handlePatientSubmit called');
         
         const formData = {
             rfid: document.getElementById('patient-rfid').value,
@@ -1217,7 +1291,10 @@ class RapidCareApp {
             role: this.currentRole
         };
 
+        console.log('Form data to submit:', formData);
+
         try {
+            console.log('Sending request to /api/patients');
             const response = await fetch('/api/patients', {
                 method: 'POST',
                 headers: {
@@ -1226,7 +1303,9 @@ class RapidCareApp {
                 body: JSON.stringify(formData)
             });
 
+            console.log('Response received:', response.status, response.statusText);
             const data = await response.json();
+            console.log('Response data:', data);
             
             if (data.success) {
                 this.addSystemMessage(`Patient ${formData.name} added successfully`);
@@ -1276,7 +1355,7 @@ class RapidCareApp {
 
         container.innerHTML = displayPatients.map(patient => `
             <div class="patient-card ${patient.triage_level.toLowerCase()}" 
-                 ${this.currentRole === 'DOCTOR' ? `onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')" style="cursor: pointer;"` : ''}>
+                 ${this.currentRole === 'DOCTOR' ? `onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')" style="cursor: pointer;"` : `data-patient-id="${patient.id}" style="cursor: pointer;"`}>
                 <div class="patient-header">
                     <h4>${patient.name || 'Unknown'}</h4>
                     <span class="triage-badge ${patient.triage_level.toLowerCase()}">${patient.triage_level}</span>
@@ -1692,7 +1771,7 @@ class RapidCareApp {
 
         container.innerHTML = sortedPatients.map(patient => `
             <div class="patient-card ${patient.triage_level.toLowerCase()}" data-triage="${patient.triage_level}"
-                 ${this.currentRole === 'DOCTOR' ? `onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')" style="cursor: pointer;"` : ''}>
+                 ${this.currentRole === 'DOCTOR' ? `onclick="app.openSoapNotes('${patient.id}', '${patient.name || 'Unknown'}')" style="cursor: pointer;"` : `data-patient-id="${patient.id}" style="cursor: pointer;"`}>
                 <div class="patient-header">
                     <h4>${patient.name || 'Unknown'}</h4>
                     <span class="triage-badge ${patient.triage_level.toLowerCase()}">${patient.triage_level}</span>
@@ -1863,6 +1942,73 @@ class RapidCareApp {
         `;
         
         this.addSystemMessage(`Voice input method set to: ${methodNames[method]}`);
+    }
+
+    openVitalsModal(patientId) {
+        const modal = document.getElementById('vitals-modal');
+        document.getElementById('vitals-patient-id').value = patientId;
+        // Set timestamp to now
+        const now = new Date();
+        document.getElementById('vitals-timestamp').value = now.toISOString().slice(0,16);
+        // Clear form
+        document.getElementById('vitals-form').reset();
+        document.getElementById('vitals-patient-id').value = patientId;
+        document.getElementById('vitals-timestamp').value = now.toISOString().slice(0,16);
+        this.loadVitalsHistory(patientId);
+        this.showModal(modal);
+        this.addSystemMessage('Vitals entry form opened');
+    }
+    async loadVitalsHistory(patientId) {
+        const historyList = document.getElementById('vitals-history-list');
+        historyList.innerHTML = '<p>Loading...</p>';
+        try {
+            const response = await fetch(`/api/vitals?patient_id=${patientId}`);
+            const data = await response.json();
+            if (data.success && data.vitals.length > 0) {
+                historyList.innerHTML = '<ul>' + data.vitals.map(v => `
+                    <li>
+                        <strong>${new Date(v.timestamp).toLocaleString()}</strong>: 
+                        HR: ${v.heart_rate}, BP: ${v.bp_sys}/${v.bp_dia}, RR: ${v.resp_rate}, O₂: ${v.o2_sat}%, Temp: ${v.temperature}°F, Pain: ${v.pain_score}
+                    </li>
+                `).join('') + '</ul>';
+            } else {
+                historyList.innerHTML = '<p>No vitals recorded yet.</p>';
+            }
+        } catch (error) {
+            historyList.innerHTML = '<p>Error loading vitals history.</p>';
+        }
+    }
+    async handleVitalsSubmit(event) {
+        event.preventDefault();
+        const formData = {
+            patient_id: document.getElementById('vitals-patient-id').value,
+            heart_rate: document.getElementById('vitals-heart-rate').value,
+            bp_sys: document.getElementById('vitals-bp-sys').value,
+            bp_dia: document.getElementById('vitals-bp-dia').value,
+            resp_rate: document.getElementById('vitals-resp-rate').value,
+            o2_sat: document.getElementById('vitals-o2-sat').value,
+            temperature: document.getElementById('vitals-temperature').value,
+            pain_score: document.getElementById('vitals-pain-score').value,
+            timestamp: new Date(document.getElementById('vitals-timestamp').value).toISOString(),
+            created_by: this.currentRole
+        };
+        try {
+            const response = await fetch('/api/vitals', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(formData)
+            });
+            const data = await response.json();
+            if (data.success) {
+                this.addSystemMessage('Vitals saved successfully');
+                this.loadVitalsHistory(formData.patient_id);
+                document.getElementById('vitals-form').reset();
+            } else {
+                this.addSystemMessage('Error saving vitals: ' + data.error);
+            }
+        } catch (error) {
+            this.addSystemMessage('Error saving vitals');
+        }
     }
 }
 
