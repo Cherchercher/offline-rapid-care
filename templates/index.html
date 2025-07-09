@@ -416,6 +416,10 @@
                 </div>
                 <div class="modal-body">
                     <form id="vitals-form">
+                        <div style="display:flex; gap:10px; margin-bottom:10px;">
+                            <button type="button" id="vitals-record-btn" class="btn-primary" style="background:#dc2626;color:#fff;">Record Vitals</button>
+                        </div>
+                        <div id="vitals-record-progress" style="margin-bottom:10px; color:#dc2626; font-weight:bold; display:none;"></div>
                         <input type="hidden" id="vitals-patient-id">
                         <div class="form-group">
                             <label for="vitals-heart-rate">Heart Rate (BPM):</label>
@@ -465,6 +469,7 @@
                             <input type="datetime-local" id="vitals-timestamp" required>
                         </div>
                         <button type="submit" class="btn-primary">Save Vitals</button>
+                        <!-- Removed audio upload, progress, and transcription UI -->
                     </form>
                     <hr>
                     <div id="vitals-history">

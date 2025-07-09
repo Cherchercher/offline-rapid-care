@@ -6,6 +6,7 @@ from datetime import datetime
 import uuid
 from model_manager_api import get_api_model_manager
 from database_setup import get_db_manager
+import re
 
 app = Flask(__name__)
 
@@ -1052,6 +1053,30 @@ def vitals_api():
         print('--- Exception in /api/vitals ---')
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/vitals/extract', methods=['POST'])
+def extract_vitals_from_transcription():
+    data = request.json
+    transcription = data.get('transcription', '')
+    # Use regex to extract vitals
+    def extract(pattern, text, group=1):
+        m = re.search(pattern, text, re.IGNORECASE)
+        return m.group(group) if m else None
+    result = {
+        'heart_rate': extract(r'heart rate(?: is|:)?\s*(\d+)', transcription),
+        'bp_sys': None,
+        'bp_dia': None,
+        'resp_rate': extract(r'respiratory rate(?: is|:)?\s*(\d+)', transcription),
+        'o2_sat': extract(r'(?:o2|oxygen saturation)(?: is|:)?\s*(\d+)', transcription),
+        'temperature': extract(r'temperature(?: is|:)?\s*(\d+(?:\.\d+)?)', transcription),
+        'pain_score': extract(r'pain score(?: is|:)?\s*(\d+)', transcription)
+    }
+    # Blood pressure: look for "blood pressure 120 over 80" or "blood pressure is 120/80"
+    bp_match = re.search(r'blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)', transcription, re.IGNORECASE)
+    if bp_match:
+        result['bp_sys'] = bp_match.group(1)
+        result['bp_dia'] = bp_match.group(2)
+    return jsonify({'success': True, 'vitals': result})
 
 if __name__ == '__main__':
     # For development, you can use a self-signed certificate

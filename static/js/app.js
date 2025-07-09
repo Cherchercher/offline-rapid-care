@@ -230,6 +230,100 @@ class RapidCareApp {
                 }
             });
         }
+
+        // Vitals audio upload/record
+        const recordBtn = document.getElementById('vitals-record-btn');
+        const progressDiv = document.getElementById('vitals-record-progress');
+        let mediaRecorder = null;
+        let audioChunks = [];
+        let isRecording = false;
+        
+        if (recordBtn) recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                // Start recording
+                if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                    alert('Audio recording not supported in this browser.');
+                    return;
+                }
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = (e) => {
+                        if (e.data.size > 0) audioChunks.push(e.data);
+                    };
+                    mediaRecorder.onstop = async () => {
+                        progressDiv.style.display = 'block';
+                        progressDiv.textContent = 'Transcribing audio...';
+                        const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        const formData = new FormData();
+                        formData.append('audio', audioBlob, 'vitals.webm');
+                        try {
+                            const resp = await fetch('/chat/audio', { method: 'POST', body: formData });
+                            const data = await resp.json();
+                            if (!data.success || !data.transcription) {
+                                progressDiv.textContent = 'Transcription failed.';
+                                isRecording = false;
+                                recordBtn.textContent = 'Record Vitals';
+                                return;
+                            }
+                            progressDiv.textContent = 'Extracting vitals from transcription (AI)...';
+                            // Send transcription to /chat/text with system prompt
+                            const systemPrompt = `Extract the following patient vitals from the text. Output ONLY a JSON object with keys: heart_rate, bp_sys, bp_dia, resp_rate, o2_sat, temperature, pain_score. If a value is missing, use null.\nText: ${data.transcription}`;
+                            const extractResp = await fetch('/chat/text', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                    messages: [
+                                        { role: 'system', content: systemPrompt },
+                                        { role: 'user', content: data.transcription }
+                                    ]
+                                })
+                            });
+                            const extractData = await extractResp.json();
+                            let vitals = null;
+                            if (extractData.success && extractData.response) {
+                                try {
+                                    const match = extractData.response.match(/\{[\s\S]*\}/);
+                                    if (match) {
+                                        vitals = JSON.parse(match[0]);
+                                    }
+                                } catch (err) {}
+                            }
+                            if (vitals) {
+                                if (vitals.heart_rate) document.getElementById('vitals-heart-rate').value = vitals.heart_rate;
+                                if (vitals.bp_sys) document.getElementById('vitals-bp-sys').value = vitals.bp_sys;
+                                if (vitals.bp_dia) document.getElementById('vitals-bp-dia').value = vitals.bp_dia;
+                                if (vitals.resp_rate) document.getElementById('vitals-resp-rate').value = vitals.resp_rate;
+                                if (vitals.o2_sat) document.getElementById('vitals-o2-sat').value = vitals.o2_sat;
+                                if (vitals.temperature) document.getElementById('vitals-temperature').value = vitals.temperature;
+                                if (vitals.pain_score) document.getElementById('vitals-pain-score').value = vitals.pain_score;
+                                progressDiv.textContent = 'Vitals extracted and fields filled.';
+                            } else {
+                                progressDiv.textContent = 'Could not extract vitals from transcription.';
+                            }
+                        } catch (err) {
+                            progressDiv.textContent = 'Error during audio transcription or extraction.';
+                        }
+                        setTimeout(() => { progressDiv.style.display = 'none'; }, 4000);
+                        isRecording = false;
+                        recordBtn.textContent = 'Record Vitals';
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    recordBtn.textContent = 'Stop Recording';
+                    progressDiv.style.display = 'block';
+                    progressDiv.textContent = 'Recording...';
+                } catch (err) {
+                    alert('Could not start audio recording: ' + err.message);
+                }
+            } else {
+                // Stop recording
+                if (mediaRecorder && isRecording) {
+                    mediaRecorder.stop();
+                }
+            }
+        });
     }
 
     handleRoleSelection(event) {
@@ -255,6 +349,64 @@ class RapidCareApp {
 
         // Update action cards based on role
         this.updateActionCardsForRole(role);
+
+// --- Overall Dictation for Vitals ---
+const overallBtn = document.getElementById('vitals-overall-dictation-btn');
+if (overallBtn) overallBtn.addEventListener('click', () => {
+    this.stopVoiceInput();
+    // Show stop button
+    const stopBtn = document.getElementById('vitals-stop-dictation-btn');
+    if (stopBtn) stopBtn.style.display = 'inline-block';
+    if (!('webkitSpeechRecognition' in window)) {
+        alert('Speech recognition not supported in this browser.');
+        return;
+    }
+    this.recognition = new webkitSpeechRecognition();
+    this.recognition.lang = 'en-US';
+    this.recognition.interimResults = false;
+    this.recognition.maxAlternatives = 1;
+    this.recognition.onresult = (event) => {
+        let transcript = event.results[0][0].transcript.trim().toLowerCase();
+        // Parse all vitals from transcript
+        const fields = {
+            'vitals-heart-rate': /heart rate(?: is|:)?\s*(\d+)/,
+            'vitals-bp-sys': /blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)/,
+            'vitals-bp-dia': /blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)/,
+            'vitals-resp-rate': /respiratory rate(?: is|:)?\s*(\d+)/,
+            'vitals-o2-sat': /o2|oxygen saturation(?: is|:)?\s*(\d+)/,
+            'vitals-temperature': /temperature(?: is|:)?\s*(\d+(?:\.\d+)?)/,
+            'vitals-pain-score': /pain score(?: is|:)?\s*(\d+)/
+        };
+        // Heart rate
+        const hr = transcript.match(fields['vitals-heart-rate']);
+        if (hr) document.getElementById('vitals-heart-rate').value = hr[1];
+        // Blood pressure
+        const bp = transcript.match(fields['vitals-bp-sys']);
+        if (bp) {
+            document.getElementById('vitals-bp-sys').value = bp[1];
+            document.getElementById('vitals-bp-dia').value = bp[2];
+        }
+        // Respiratory rate
+        const rr = transcript.match(fields['vitals-resp-rate']);
+        if (rr) document.getElementById('vitals-resp-rate').value = rr[1];
+        // O2 saturation
+        const o2 = transcript.match(fields['vitals-o2-sat']);
+        if (o2) document.getElementById('vitals-o2-sat').value = o2[1];
+        // Temperature
+        const temp = transcript.match(fields['vitals-temperature']);
+        if (temp) document.getElementById('vitals-temperature').value = temp[1];
+        // Pain score
+        const pain = transcript.match(fields['vitals-pain-score']);
+        if (pain) document.getElementById('vitals-pain-score').value = pain[1];
+        this.addSystemMessage('Overall dictation parsed and fields filled.');
+        if (stopBtn) stopBtn.style.display = 'none';
+    };
+    this.recognition.onend = () => {
+        const stopBtn = document.getElementById('vitals-stop-dictation-btn');
+        if (stopBtn) stopBtn.style.display = 'none';
+    };
+    this.recognition.start();
+});
 
         // Add system message
         this.addSystemMessage(`Logged in as ${this.getRoleDisplayName(role)}. System ready for emergency response.`);
@@ -1497,238 +1649,63 @@ class RapidCareApp {
     }
 
     startVoiceInput(field = 'patient-notes') {
-        // If no specific method is set, default to webkit
-        if (!this.currentVoiceMethod) {
-            this.currentVoiceMethod = 'webkit';
-        }
-        
+        // Stop any previous dictation
+        this.stopVoiceInput();
         this.currentVoiceField = field;
-        
-        // Get the specific mic button that was clicked
-        const micButton = document.getElementById(field === 'patient-notes' ? 'notes-voice-btn' : `${field}-voice-btn`);
-        
-        // Check if already recording
-        if (this.isRecording) {
-            // Stop recording
-            this.stopVoiceInput();
-            return;
+        const input = document.getElementById(field);
+        if (input) {
+            input.classList.add('voice-active');
         }
-        
-        // Start recording
-        this.isRecording = true;
-        
-        // Update the mic button to show recording state
-        micButton.classList.add('recording');
-        micButton.innerHTML = '<i class="fas fa-stop"></i>';
-        
-        switch (this.currentVoiceMethod) {
-            case 'webkit':
-                this.startWebkitRecordingForField(field);
-                break;
-            case 'gemma':
-                this.startGemmaRecordingForField(field, 'Transcribe the following audio accurately:');
-                break;
-            case 'gemma-finetuned':
-                this.startGemmaRecordingForField(field, 'Transcribe the following medical audio with clinical terminology:');
-                break;
-        }
-    }
-
-    startWebkitRecordingForField(field) {
+        // Show stop button if in vitals modal
+        const stopBtn = document.getElementById('vitals-stop-dictation-btn');
+        if (stopBtn) stopBtn.style.display = 'inline-block';
+        // Start recognition
         if (!('webkitSpeechRecognition' in window)) {
-            this.addSystemMessage('Error: Speech recognition not supported');
-            this.stopVoiceInput();
+            alert('Speech recognition not supported in this browser.');
             return;
         }
-
         this.recognition = new webkitSpeechRecognition();
-        this.recognition.continuous = false;
-        this.recognition.interimResults = true;
         this.recognition.lang = 'en-US';
-
-        const textarea = document.getElementById(field);
-
-        this.recognition.onstart = () => {
-            this.addSystemMessage('Voice recording started. Click stop when finished.');
-        };
-
+        this.recognition.interimResults = false;
+        this.recognition.maxAlternatives = 1;
         this.recognition.onresult = (event) => {
-            let finalTranscript = '';
-            let interimTranscript = '';
-
-            for (let i = event.resultIndex; i < event.results.length; i++) {
-                const transcript = event.results[i][0].transcript;
-                if (event.results[i].isFinal) {
-                    finalTranscript += transcript + ' ';
+            let transcript = event.results[0][0].transcript.trim();
+            // If numeric field, extract number
+            if (input && input.type === 'number') {
+                const numMatch = transcript.match(/(-?\d+(?:\.\d+)?)/);
+                if (numMatch) {
+                    input.value = numMatch[1];
                 } else {
-                    interimTranscript += transcript;
+                    input.value = '';
+                    this.addSystemMessage('No number detected in dictation.');
                 }
-            }
-
-            // Update the textarea with the transcription
-            if (finalTranscript.trim()) {
-                const currentText = textarea.value;
-                const separator = currentText && !currentText.endsWith('.') && !currentText.endsWith(' ') ? '. ' : ' ';
-                textarea.value = currentText + separator + finalTranscript.trim();
-                textarea.focus();
-            }
-        };
-
-        this.recognition.onerror = (event) => {
-            console.error('Speech recognition error:', event.error);
-            if (event.error !== 'no-speech') {
-                this.addSystemMessage(`Voice recognition error: ${event.error}`);
-                this.stopVoiceInput();
-            }
-        };
-
-        this.recognition.onend = () => {
-            this.stopVoiceInput();
-            this.addSystemMessage('Voice recording completed');
-        };
-
-        this.recognition.start();
-    }
-
-    startGemmaRecordingForField(field, prompt) {
-        // Check if MediaDevices API is available
-        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-            console.error('MediaDevices API not supported');
-            this.addSystemMessage('Error: Media recording not supported in this browser');
-            this.stopVoiceInput();
-            return;
-        }
-
-        // Use MediaRecorder API to record audio
-        navigator.mediaDevices.getUserMedia({ audio: true })
-            .then(stream => {
-                this.stream = stream;
-                // Try different audio formats in order of preference
-                let mimeType = '';
-                if (MediaRecorder.isTypeSupported('audio/webm')) {
-                    mimeType = 'audio/webm';
-                } else if (MediaRecorder.isTypeSupported('audio/ogg')) {
-                    mimeType = 'audio/ogg';
-                } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
-                    mimeType = 'audio/mp4';
-                } else {
-                    console.warn('No specific format supported, using default');
-                }
-                console.log('Using audio format:', mimeType || 'default');
-                this.mediaRecorder = new MediaRecorder(stream, { mimeType: mimeType });
-                this.recordedChunks = [];
-
-                this.mediaRecorder.ondataavailable = (event) => {
-                    console.log('🔊 Data available:', event.data.size, 'bytes');
-                    if (event.data.size > 0) {
-                        this.recordedChunks.push(event.data);
-                        console.log('🔊 Total chunks:', this.recordedChunks.length);
-                    }
-                };
-
-                this.mediaRecorder.onstop = () => {
-                    console.log('🔊 MediaRecorder onstop triggered');
-                    this.processGemmaRecordingForField(field, prompt);
-                };
-
-                this.mediaRecorder.start();
-                this.addSystemMessage('Voice recording started. Click stop when finished.');
-            })
-            .catch(error => {
-                console.error('Error accessing microphone:', error);
-                this.addSystemMessage('Error: Could not access microphone - ' + error.message);
-                this.stopVoiceInput();
-            });
-    }
-
-    async processGemmaRecordingForField(field, prompt) {
-        console.log('🔊 processGemmaRecordingForField called');
-        console.log('   Field:', field);
-        console.log('   Prompt:', prompt);
-        console.log('   Media recorder:', this.mediaRecorder);
-        console.log('   Recorded chunks:', this.recordedChunks.length);
-        
-        try {
-            // Get the actual MIME type from the recorder
-            const mimeType = this.mediaRecorder.mimeType;
-            console.log('Recording MIME type:', mimeType);
-            
-            // Determine file extension based on MIME type
-            let extension = '.webm'; // default
-            if (mimeType.includes('webm')) extension = '.webm';
-            else if (mimeType.includes('ogg')) extension = '.ogg';
-            else if (mimeType.includes('mp4')) extension = '.m4a';
-            else if (mimeType.includes('wav')) extension = '.wav';
-            
-            const blob = new Blob(this.recordedChunks, { type: mimeType });
-            const formData = new FormData();
-            const filename = `recording${extension}`;
-            formData.append('file', blob, filename);
-            formData.append('prompt', prompt);
-            formData.append('role', this.currentRole);
-            
-            console.log('🔊 Audio upload details:');
-            console.log('   MIME type:', mimeType);
-            console.log('   Extension:', extension);
-            console.log('   Filename:', filename);
-            console.log('   Blob size:', blob.size, 'bytes');
-
-            this.addSystemMessage('Transcribing with Gemma 3n...');
-
-            const response = await fetch('/api/transcribe-audio', {
-                method: 'POST',
-                body: formData
-            });
-
-            const data = await response.json();
-
-            if (data.success) {
-                // Update the textarea with the transcription
-                const textarea = document.getElementById(field);
-                const currentText = textarea.value;
-                const separator = currentText && !currentText.endsWith('.') && !currentText.endsWith(' ') ? '. ' : ' ';
-                textarea.value = currentText + separator + data.transcription;
-                textarea.focus();
-                
-                this.addSystemMessage('Transcription completed successfully');
             } else {
-                this.addSystemMessage('Error: Transcription failed - ' + data.error);
+                input.value = transcript;
             }
-        } catch (error) {
-            console.error('Error processing recording:', error);
-            this.addSystemMessage('Error: Failed to process recording');
-        }
+            input.classList.remove('voice-active');
+            this.currentVoiceField = null;
+            if (stopBtn) stopBtn.style.display = 'none';
+        };
+        this.recognition.onend = () => {
+            if (input) input.classList.remove('voice-active');
+            this.currentVoiceField = null;
+            if (stopBtn) stopBtn.style.display = 'none';
+        };
+        this.recognition.start();
     }
 
     stopVoiceInput() {
         if (this.recognition) {
             this.recognition.stop();
+            this.recognition = null;
         }
-        if (this.mediaRecorder && this.isRecording) {
-            this.mediaRecorder.stop();
+        if (this.currentVoiceField) {
+            const input = document.getElementById(this.currentVoiceField);
+            if (input) input.classList.remove('voice-active');
+            this.currentVoiceField = null;
         }
-        if (this.stream) {
-            this.stream.getTracks().forEach(track => track.stop());
-        }
-        
-        this.isRecording = false;
-        
-        // Reset all voice buttons
-        const voiceButtons = [
-            'notes-voice-btn',
-            'soap-subjective-voice-btn',
-            'soap-objective-voice-btn',
-            'soap-assessment-voice-btn',
-            'soap-plan-voice-btn'
-        ];
-        
-        voiceButtons.forEach(btnId => {
-            const btn = document.getElementById(btnId);
-            if (btn) {
-                btn.classList.remove('recording');
-                btn.innerHTML = '<i class="fas fa-microphone"></i>';
-            }
-        });
+        const stopBtn = document.getElementById('vitals-stop-dictation-btn');
+        if (stopBtn) stopBtn.style.display = 'none';
     }
 
     showPatientsList() {
