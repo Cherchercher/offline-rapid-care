@@ -1965,10 +1965,13 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
             resp_rate: document.getElementById('vitals-resp-rate').value,
             o2_sat: document.getElementById('vitals-o2-sat').value,
             temperature: document.getElementById('vitals-temperature').value,
-            pain_score: document.getElementById('vitals-pain-score').value,
             timestamp: new Date(document.getElementById('vitals-timestamp').value).toISOString(),
             created_by: this.currentRole
         };
+        const painScoreValue = document.getElementById('vitals-pain-score').value;
+        if (painScoreValue) {
+            formData.pain_score = painScoreValue;
+        }
         try {
             const response = await fetch('/api/vitals', {
                 method: 'POST',
