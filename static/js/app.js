@@ -257,9 +257,9 @@ class RapidCareApp {
                         progressDiv.textContent = 'Transcribing audio...';
                         const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                         const formData = new FormData();
-                        formData.append('audio', audioBlob, 'vitals.webm');
+                        formData.append('file', audioBlob, 'vitals.webm');
                         try {
-                            const resp = await fetch('/chat/audio', { method: 'POST', body: formData });
+                            const resp = await fetch('/api/transcribe-audio', { method: 'POST', body: formData });
                             const data = await resp.json();
                             if (!data.success || !data.transcription) {
                                 progressDiv.textContent = 'Transcription failed.';
@@ -268,15 +268,15 @@ class RapidCareApp {
                                 return;
                             }
                             progressDiv.textContent = 'Extracting vitals from transcription (AI)...';
-                            // Send transcription to /chat/text with system prompt
-                            const systemPrompt = `Extract the following patient vitals from the text. Output ONLY a JSON object with keys: heart_rate, bp_sys, bp_dia, resp_rate, o2_sat, temperature, pain_score. If a value is missing, use null.\nText: ${data.transcription}`;
+
+                            const systemPrompt = `Extract the following patient vitals from the text. Output ONLY a JSON object with keys: heart_rate, bp_sys, bp_dia, resp_rate, o2_sat, temperature, pain_score. If a value is missing, use null.\n`;
                             const extractResp = await fetch('/chat/text', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     messages: [
-                                        { role: 'system', content: systemPrompt },
-                                        { role: 'user', content: data.transcription }
+                                        { role: 'system', content: [ {"type": "text", "text": systemPrompt }] },
+                                        { role: 'user', content: [ {"type": "text", "text": `Text: ${data.transcription}`}] }
                                     ]
                                 })
                             });

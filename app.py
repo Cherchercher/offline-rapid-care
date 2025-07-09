@@ -87,52 +87,19 @@ def uploaded_file(filename):
     # For other files, use send_from_directory
     return send_from_directory(UPLOADS_DIR, filename, mimetype=mime_type)
 
-@app.route('/api/chat', methods=['POST'])
-def chat():
+@app.route('/chat/text', methods=['POST'])
+def chat_text():
     try:
         data = request.json
-        user_message = data.get('message', '')
-        user_role = data.get('role', 'PARAMEDIC')
-        patient_id = data.get('patient_id', None)
-        
-        # Create system prompt based on role with triage requirements
-        system_prompt = f"""You are a {user_role.lower()} in a mass casualty incident response system. 
-        
-        CRITICAL REQUIREMENTS:
-        1. ALWAYS provide a triage category (RED, YELLOW, GREEN, BLACK) at the beginning of your response
-        2. ALWAYS provide clear reasoning for your triage decision
-        3. ALWAYS provide specific actionable steps for the situation
-        4. Use medical triage protocols and emergency response procedures
-        
-        TRIAGE CATEGORIES:
-        - RED (Immediate): Life-threatening injuries requiring immediate attention
-        - YELLOW (Delayed): Serious injuries that can wait for treatment
-        - GREEN (Minor): Minor injuries that can wait or self-treat
-        - BLACK (Deceased/Expectant): Deceased or injuries incompatible with life
-        
-        Current time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-        
-        Format your response as:
-        **Triage: [CATEGORY]** **Reasoning:** [Clear explanation] **Action:** [Specific steps]"""
-        
-        # Prepare messages for model
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_message}
-        ]
-        
-        # Use model manager to get response
-        result = model_manager.chat(messages)
-        
+        messages = data.get('messages', [])
+        if not messages:
+            return jsonify({'success': False, 'error': 'No messages provided'}), 400
+
+        result = model_manager.chat_text(messages)
         if result['success']:
-            assistant_message = result['response']
-            
-            # Log the interaction
-            log_interaction(user_role, user_message, assistant_message, patient_id)
-            
             return jsonify({
                 'success': True,
-                'response': assistant_message,
+                'response': result['response'],
                 'timestamp': datetime.now().isoformat(),
                 'mode': result.get('mode', 'unknown')
             })
@@ -141,12 +108,11 @@ def chat():
                 'success': False,
                 'error': result.get('error', 'Unknown error')
             }), 500
-            
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    
 
 @app.route('/api/video/upload', methods=['POST'])
 def upload_video():
@@ -192,6 +158,8 @@ def upload_video():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -231,6 +199,8 @@ def analyze_video():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -289,6 +259,8 @@ def analyze_frame():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -352,6 +324,8 @@ def analyze_media():
             })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -397,6 +371,8 @@ def transcribe_voice():
                 pass
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -460,6 +436,8 @@ def transcribe_text():
             })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -519,6 +497,8 @@ def analyze_image_file(file, user_role):
         return analysis
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"❌ Error analyzing image: {str(e)}")
         return f"Error analyzing image: {str(e)}"
 
@@ -558,6 +538,8 @@ def analyze_video_file(file, user_role):
             return f"Error analyzing video: {result.get('error', 'Unknown error')}"
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f"Error analyzing video: {str(e)}"
 
 def combine_analysis_results(results, user_role):
@@ -707,6 +689,8 @@ def transcribe_audio_with_ollama(audio_path, user_role):
         # Fallback if speech recognition libraries aren't available
         return "Speech recognition not available. Please install: pip install SpeechRecognition pydub pyaudio"
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return f"Transcription error: {str(e)}"
 
 @app.route('/api/patients', methods=['GET', 'POST'])
@@ -801,6 +785,8 @@ def soap_notes_api():
                 }), 500
             
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -849,6 +835,8 @@ def switch_model_mode():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -917,10 +905,10 @@ def missing_persons_api():
             })
     
     except Exception as e:
-        print(f"--- Exception in missing_persons_api ---")
-        print(f"Traceback (most recent call last):")
         import traceback
         traceback.print_exc()
+        print(f"--- Exception in missing_persons_api ---")
+        print(f"Traceback (most recent call last):")
         return jsonify({
             'success': False,
             'error': str(e)
@@ -953,6 +941,8 @@ def find_match():
         })
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -1023,6 +1013,9 @@ def transcribe_audio():
             }), 500
         
     except Exception as e:
+        import traceback
+        traceback.print_exc()
+        
         return jsonify({
             'success': False,
             'error': str(e)
