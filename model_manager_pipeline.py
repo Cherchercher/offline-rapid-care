@@ -9,6 +9,7 @@ import base64
 from typing import Dict, List, Optional
 import time
 import os
+from prompts import MEDICAL_TRIAGE_PROMPT
 
 class ModelManagerPipeline:
     """Model manager using direct model loading for all tasks"""
@@ -351,26 +352,7 @@ class ModelManagerPipeline:
             print(f"🔊 Frame saving completed in {save_time:.2f} seconds")
             
             # Add structured text prompt for medical triage assessment
-            structured_prompt = """MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:
-
-**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]
-**REASONING:** [Clear explanation of triage decision based on observed conditions]
-
-**PATIENT INFORMATION:**
-- **Approximate Age:** [Estimate age range]
-- **Gender:** [Male/Female/Unknown]
-- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]
-- **Brief Assessment Findings:** [Key observations from the video frames]
-
-**TRIAGE CATEGORY DETAILS:**
-- **RED (Immediate):** Life-threatening injuries requiring immediate attention
-- **YELLOW (Delayed):** Serious injuries that can wait for treatment  
-- **GREEN (Minor):** Minor injuries that can wait or self-treat
-- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life
-
-**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]
-
-CRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure. Focus on visible injuries, level of consciousness, breathing patterns, bleeding, and overall patient condition."""
+            structured_prompt = MEDICAL_TRIAGE_PROMPT
             
             content.append({"type": "text", "text": structured_prompt})
             

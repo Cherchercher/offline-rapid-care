@@ -102,6 +102,75 @@ class RapidCareApp {
         document.getElementById('analyze-media-btn').addEventListener('click', () => this.analyzeMedia());
         document.getElementById('close-media-btn').addEventListener('click', () => this.closeModal(document.getElementById('media-modal')));
 
+        // AI Search events
+        document.getElementById('description-search-btn').addEventListener('click', () => this.searchByDescription());
+        document.getElementById('close-ai-search-btn').addEventListener('click', () => this.closeModal(document.getElementById('ai-search-modal')));
+
+        // Photo upload for missing person form
+        const photoUploadArea = document.getElementById('photo-upload-area');
+        const photoInput = document.getElementById('missing-person-photo-input');
+        const photoPreview = document.getElementById('photo-preview');
+        const photoPreviewImg = document.getElementById('photo-preview-img');
+        const removePhotoBtn = document.getElementById('remove-photo-btn');
+
+        if (photoUploadArea && photoInput) {
+            photoUploadArea.addEventListener('click', () => photoInput.click());
+            photoInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        photoPreviewImg.src = e.target.result;
+                        photoPreview.style.display = 'block';
+                        photoUploadArea.style.display = 'none';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        if (removePhotoBtn) {
+            removePhotoBtn.addEventListener('click', () => {
+                photoInput.value = '';
+                photoPreview.style.display = 'none';
+                photoUploadArea.style.display = 'block';
+            });
+        }
+
+        // Photo upload for search form
+        const searchPhotoUploadArea = document.getElementById('search-photo-upload-area');
+        const searchPhotoInput = document.getElementById('search-photo-input');
+        const searchPhotoPreview = document.getElementById('search-photo-preview');
+        const searchPhotoPreviewImg = document.getElementById('search-photo-preview-img');
+        const removeSearchPhotoBtn = document.getElementById('remove-search-photo-btn');
+        const searchMatchBtn = document.getElementById('search-match-btn');
+
+        if (searchPhotoUploadArea && searchPhotoInput) {
+            searchPhotoUploadArea.addEventListener('click', () => searchPhotoInput.click());
+            searchPhotoInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        searchPhotoPreviewImg.src = e.target.result;
+                        searchPhotoPreview.style.display = 'block';
+                        searchPhotoUploadArea.style.display = 'none';
+                        if (searchMatchBtn) searchMatchBtn.disabled = false;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+
+        if (removeSearchPhotoBtn) {
+            removeSearchPhotoBtn.addEventListener('click', () => {
+                searchPhotoInput.value = '';
+                searchPhotoPreview.style.display = 'none';
+                searchPhotoUploadArea.style.display = 'block';
+                if (searchMatchBtn) searchMatchBtn.disabled = true;
+            });
+        }
+
         // File upload
         const uploadArea = document.getElementById('upload-area');
         const fileInput = document.getElementById('file-input');
@@ -168,6 +237,78 @@ class RapidCareApp {
 
         // Vitals form submit
         document.getElementById('vitals-form').addEventListener('submit', (e) => this.handleVitalsSubmit(e));
+
+        // Vitals dictation buttons
+        const overallBtn = document.getElementById('vitals-overall-dictation-btn');
+        if (overallBtn) {
+            overallBtn.addEventListener('click', () => {
+                this.stopVoiceInput();
+                // Show stop button
+                const stopBtn = document.getElementById('vitals-stop-dictation-btn');
+                if (stopBtn) stopBtn.style.display = 'inline-block';
+                if (!('webkitSpeechRecognition' in window)) {
+                    alert('Speech recognition not supported in this browser.');
+                    return;
+                }
+                this.recognition = new webkitSpeechRecognition();
+                this.recognition.lang = 'en-US';
+                this.recognition.interimResults = false;
+                this.recognition.maxAlternatives = 1;
+                this.recognition.onresult = (event) => {
+                    let transcript = event.results[0][0].transcript.trim().toLowerCase();
+                    // Parse all vitals from transcript
+                    const fields = {
+                        'vitals-heart-rate': /heart rate(?: is|:)?\s*(\d+)/,
+                        'vitals-bp-sys': /blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)/,
+                        'vitals-bp-dia': /blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)/,
+                        'vitals-resp-rate': /respiratory rate(?: is|:)?\s*(\d+)/,
+                        'vitals-o2-sat': /o2|oxygen saturation(?: is|:)?\s*(\d+)/,
+                        'vitals-temperature': /temperature(?: is|:)?\s*(\d+(?:\.\d+)?)/,
+                        'vitals-pain-score': /pain score(?: is|:)?\s*(\d+)/
+                    };
+                    // Heart rate
+                    const hr = transcript.match(fields['vitals-heart-rate']);
+                    if (hr) document.getElementById('vitals-heart-rate').value = hr[1];
+                    // Blood pressure
+                    const bp = transcript.match(fields['vitals-bp-sys']);
+                    if (bp) {
+                        document.getElementById('vitals-bp-sys').value = bp[1];
+                        document.getElementById('vitals-bp-dia').value = bp[2];
+                    }
+                    // Respiratory rate
+                    const rr = transcript.match(fields['vitals-resp-rate']);
+                    if (rr) document.getElementById('vitals-resp-rate').value = rr[1];
+                    // O2 saturation
+                    const o2 = transcript.match(fields['vitals-o2-sat']);
+                    if (o2) document.getElementById('vitals-o2-sat').value = o2[1];
+                    // Temperature
+                    const temp = transcript.match(fields['vitals-temperature']);
+                    if (temp) document.getElementById('vitals-temperature').value = temp[1];
+                    // Pain score
+                    const pain = transcript.match(fields['vitals-pain-score']);
+                    if (pain) document.getElementById('vitals-pain-score').value = pain[1];
+                    this.addSystemMessage('Overall dictation parsed and fields filled.');
+                    if (stopBtn) stopBtn.style.display = 'none';
+                };
+                this.recognition.onend = () => {
+                    const stopBtn = document.getElementById('vitals-stop-dictation-btn');
+                    if (stopBtn) stopBtn.style.display = 'none';
+                };
+                this.recognition.start();
+            });
+        }
+
+        // Missing person form submit
+        const missingPersonForm = document.getElementById('missing-person-form');
+        if (missingPersonForm) {
+            missingPersonForm.addEventListener('submit', (e) => this.handleMissingPersonSubmit(e));
+        }
+
+        // Find match form submit
+        const findMatchForm = document.getElementById('find-match-form');
+        if (findMatchForm) {
+            findMatchForm.addEventListener('submit', (e) => this.handleFindMatchSubmit(e));
+        }
         // Voice input for each vitals field
         const vitalsVoiceFields = [
             { btn: 'vitals-heart-rate-voice-btn', field: 'vitals-heart-rate' },
@@ -269,13 +410,12 @@ class RapidCareApp {
                             }
                             progressDiv.textContent = 'Extracting vitals from transcription (AI)...';
 
-                            const systemPrompt = `Extract the following patient vitals from the text. Output ONLY a JSON object with keys: heart_rate, bp_sys, bp_dia, resp_rate, o2_sat, temperature, pain_score. If a value is missing, use null.\n`;
                             const extractResp = await fetch('/chat/text', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({
                                     messages: [
-                                        { role: 'system', content: [ {"type": "text", "text": systemPrompt }] },
+                                        { role: 'system', content: [ {"type": "text", "text": PROMPTS.VITALS_EXTRACTION }] },
                                         { role: 'user', content: [ {"type": "text", "text": `Text: ${data.transcription}`}] }
                                     ]
                                 })
@@ -349,64 +489,6 @@ class RapidCareApp {
 
         // Update action cards based on role
         this.updateActionCardsForRole(role);
-
-// --- Overall Dictation for Vitals ---
-const overallBtn = document.getElementById('vitals-overall-dictation-btn');
-if (overallBtn) overallBtn.addEventListener('click', () => {
-    this.stopVoiceInput();
-    // Show stop button
-    const stopBtn = document.getElementById('vitals-stop-dictation-btn');
-    if (stopBtn) stopBtn.style.display = 'inline-block';
-    if (!('webkitSpeechRecognition' in window)) {
-        alert('Speech recognition not supported in this browser.');
-        return;
-    }
-    this.recognition = new webkitSpeechRecognition();
-    this.recognition.lang = 'en-US';
-    this.recognition.interimResults = false;
-    this.recognition.maxAlternatives = 1;
-    this.recognition.onresult = (event) => {
-        let transcript = event.results[0][0].transcript.trim().toLowerCase();
-        // Parse all vitals from transcript
-        const fields = {
-            'vitals-heart-rate': /heart rate(?: is|:)?\s*(\d+)/,
-            'vitals-bp-sys': /blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)/,
-            'vitals-bp-dia': /blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)/,
-            'vitals-resp-rate': /respiratory rate(?: is|:)?\s*(\d+)/,
-            'vitals-o2-sat': /o2|oxygen saturation(?: is|:)?\s*(\d+)/,
-            'vitals-temperature': /temperature(?: is|:)?\s*(\d+(?:\.\d+)?)/,
-            'vitals-pain-score': /pain score(?: is|:)?\s*(\d+)/
-        };
-        // Heart rate
-        const hr = transcript.match(fields['vitals-heart-rate']);
-        if (hr) document.getElementById('vitals-heart-rate').value = hr[1];
-        // Blood pressure
-        const bp = transcript.match(fields['vitals-bp-sys']);
-        if (bp) {
-            document.getElementById('vitals-bp-sys').value = bp[1];
-            document.getElementById('vitals-bp-dia').value = bp[2];
-        }
-        // Respiratory rate
-        const rr = transcript.match(fields['vitals-resp-rate']);
-        if (rr) document.getElementById('vitals-resp-rate').value = rr[1];
-        // O2 saturation
-        const o2 = transcript.match(fields['vitals-o2-sat']);
-        if (o2) document.getElementById('vitals-o2-sat').value = o2[1];
-        // Temperature
-        const temp = transcript.match(fields['vitals-temperature']);
-        if (temp) document.getElementById('vitals-temperature').value = temp[1];
-        // Pain score
-        const pain = transcript.match(fields['vitals-pain-score']);
-        if (pain) document.getElementById('vitals-pain-score').value = pain[1];
-        this.addSystemMessage('Overall dictation parsed and fields filled.');
-        if (stopBtn) stopBtn.style.display = 'none';
-    };
-    this.recognition.onend = () => {
-        const stopBtn = document.getElementById('vitals-stop-dictation-btn');
-        if (stopBtn) stopBtn.style.display = 'none';
-    };
-    this.recognition.start();
-});
 
         // Add system message
         this.addSystemMessage(`Logged in as ${this.getRoleDisplayName(role)}. System ready for emergency response.`);
@@ -600,6 +682,9 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
                 console.log('Voice input action triggered');
                 this.openVoiceInputModal();
                 break;
+            case 'ai-search':
+                this.showModal(document.getElementById('ai-search-modal'));
+                break;
             case 'create-patient':
                 this.openPatientModal();
                 break;
@@ -645,6 +730,33 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
         document.getElementById('patient-rfid').value = rfid;
         
         this.showModal(modal);
+    }
+
+    openMissingPersonModal() {
+        const modal = document.getElementById('missing-person-modal');
+        
+        // Clear form
+        document.getElementById('missing-person-form').reset();
+        
+        this.showModal(modal);
+    }
+
+    openFindMatchModal() {
+        const modal = document.getElementById('find-match-modal');
+        
+        // Clear form
+        document.getElementById('find-match-form').reset();
+        
+        this.showModal(modal);
+    }
+
+    showMissingPersonsList() {
+        // For now, just show the AI search modal with missing persons tab
+        const modal = document.getElementById('ai-search-modal');
+        this.showModal(modal);
+        
+        // Switch to missing persons tab
+        this.switchTab('missing-persons');
     }
 
     showModal(modal) {
@@ -723,6 +835,9 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
             return;
         }
 
+        // Clear any existing recorded video preview
+        this.clearRecordedVideoPreview();
+
         this.recordedChunks = [];
         this.mediaRecorder = new MediaRecorder(this.stream, { mimeType: 'video/webm' });
 
@@ -734,6 +849,7 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
 
         this.mediaRecorder.onstop = () => {
             const blob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            this.showRecordedVideoPreview(blob);
             this.analyzeVideo(blob);
         };
 
@@ -744,6 +860,212 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
         document.getElementById('stop-record-btn').style.display = 'inline-block';
 
         this.addSystemMessage('Recording started...');
+    }
+
+    showRecordedVideoPreview(blob) {
+        const cameraContainer = document.querySelector('.camera-container');
+        const videoPreview = document.getElementById('camera-preview');
+        
+        // Remove any existing recorded video preview
+        const existingPreview = cameraContainer.querySelector('.recorded-video-preview');
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+        
+        // Remove any existing label
+        const existingLabel = cameraContainer.querySelector('.recorded-video-label');
+        if (existingLabel) {
+            existingLabel.remove();
+        }
+        
+        // Create video preview element
+        const recordedVideo = document.createElement('video');
+        recordedVideo.className = 'recorded-video-preview';
+        recordedVideo.controls = true;
+        recordedVideo.muted = true;
+        recordedVideo.style.width = '100%';
+        recordedVideo.style.maxWidth = '400px';
+        recordedVideo.style.height = '225px';
+        recordedVideo.style.borderRadius = '0.375rem';
+        recordedVideo.style.marginBottom = '1rem';
+        recordedVideo.style.background = 'var(--bg-primary)';
+        
+        // Set video source
+        const videoUrl = URL.createObjectURL(blob);
+        recordedVideo.src = videoUrl;
+        
+        // Create label
+        const label = document.createElement('p');
+        label.className = 'recorded-video-label';
+        label.textContent = 'Recorded Video Preview:';
+        label.style.fontWeight = 'bold';
+        label.style.marginBottom = '0.5rem';
+        label.style.color = 'var(--text-primary)';
+        
+        // Insert after the camera preview
+        videoPreview.parentNode.insertBefore(label, videoPreview.nextSibling);
+        label.parentNode.insertBefore(recordedVideo, label.nextSibling);
+        
+        // Auto-play the preview
+        recordedVideo.play();
+    }
+
+    clearRecordedVideoPreview() {
+        const cameraContainer = document.querySelector('.camera-container');
+        if (!cameraContainer) return;
+        
+        const existingPreview = cameraContainer.querySelector('.recorded-video-preview');
+        const existingLabel = cameraContainer.querySelector('.recorded-video-label');
+        
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+        if (existingLabel) {
+            existingLabel.remove();
+        }
+    }
+
+    // AI Search Methods
+    async searchByDescription() {
+        const description = document.getElementById('description-search-input').value.trim();
+        
+        if (!description) {
+            this.addSystemMessage('Please describe the missing person');
+            return;
+        }
+
+        try {
+            this.addSystemMessage('Searching by description...');
+            
+            const response = await fetch('/api/search/missing-persons-by-description', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    description: description,
+                    limit: 10
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
+            const data = await response.json();
+            
+            if (data.success) {
+                this.displaySearchResults(data.results, { 
+                    search_type: 'description_search',
+                    parsed_characteristics: data.parsed_characteristics
+                });
+                this.addSystemMessage(`Found ${data.total_found} potential matches`);
+            } else {
+                this.addSystemMessage(`Search failed: ${data.error}`);
+            }
+        } catch (error) {
+            console.error('Error searching by description:', error);
+            this.addSystemMessage(`Error: ${error.message}`);
+        }
+    }
+
+
+
+    displaySearchResults(results, analysis = {}) {
+        const resultsContainer = document.getElementById('search-results');
+        
+        if (!results || results.length === 0) {
+            resultsContainer.innerHTML = `
+                <div class="no-results">
+                    <i class="fas fa-search"></i>
+                    <h4>No results found</h4>
+                    <p>Try adjusting your search terms or filters</p>
+                </div>
+            `;
+            return;
+        }
+
+        let resultsHTML = '';
+        
+        if (analysis.explanation) {
+            resultsHTML += `
+                <div class="search-analysis">
+                    <h4>AI Analysis</h4>
+                    <p>${analysis.explanation}</p>
+                </div>
+            `;
+        }
+
+        resultsHTML += '<h4>Search Results</h4>';
+        
+        results.forEach(result => {
+            const sourceType = this.getSourceTypeDisplay(result.source_type);
+            const metadata = this.formatMetadata(result.metadata);
+            
+            // Add image display for missing person results
+            let imageHTML = '';
+            if (result.source_type === 'missing_person' && result.metadata && result.metadata.image_path) {
+                const imageFilename = result.metadata.image_path.split('/').pop();
+                // Use the same server to serve images (relative URL)
+                const imageUrl = `/uploads/${imageFilename}`;
+                console.log('🔍 Debug - Image path:', result.metadata.image_path);
+                console.log('🔍 Debug - Image filename:', imageFilename);
+                console.log('🔍 Debug - Image URL:', imageUrl);
+                imageHTML = `
+                    <div class="search-result-image">
+                        <img src="${imageUrl}" alt="Photo of ${result.metadata.name || 'missing person'}" 
+                             onerror="this.style.display='none'; this.onerror=null; console.log('❌ Image failed to load:', this.src);"
+                             onload="console.log('✅ Image loaded successfully:', this.src);">
+                    </div>
+                `;
+            }
+            
+            resultsHTML += `
+                <div class="search-result-item">
+                    <div class="search-result-header">
+                        <span class="search-result-type">${sourceType}</span>
+                        <span class="search-result-score">Similarity: ${(result.similarity_score * 100).toFixed(1)}%</span>
+                    </div>
+                    ${imageHTML}
+                    <div class="search-result-content">
+                        ${this.formatContent(result.content)}
+                    </div>
+                    <div class="search-result-metadata">
+                        ${metadata}
+                    </div>
+                </div>
+            `;
+        });
+
+        resultsContainer.innerHTML = resultsHTML;
+    }
+
+    getSourceTypeDisplay(sourceType) {
+        const typeMap = {
+            'patient': 'Patient Record',
+            'missing_person': 'Missing Person',
+            'soap_note': 'SOAP Note',
+            'video_analysis': 'Video Analysis',
+            'vitals': 'Vitals Record'
+        };
+        return typeMap[sourceType] || sourceType;
+    }
+
+    formatContent(content) {
+        // Format content for display
+        return content.replace(/\n/g, '<br>').substring(0, 300) + (content.length > 300 ? '...' : '');
+    }
+
+    formatMetadata(metadata) {
+        if (!metadata) return '';
+        
+        let metadataHTML = '';
+        if (metadata.name) metadataHTML += `<span><strong>Name:</strong> ${metadata.name}</span>`;
+        if (metadata.triage_level) metadataHTML += `<span><strong>Triage:</strong> ${metadata.triage_level}</span>`;
+        if (metadata.location) metadataHTML += `<span><strong>Location:</strong> ${metadata.location}</span>`;
+        if (metadata.created_at) metadataHTML += `<span><strong>Date:</strong> ${new Date(metadata.created_at).toLocaleString()}</span>`;
+        
+        return metadataHTML;
     }
 
     stopRecording() {
@@ -790,11 +1112,47 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
         Array.from(files).forEach(file => {
             const fileItem = document.createElement('div');
             fileItem.className = 'file-item';
+            
+            if (file.type.startsWith('video/')) {
+                // Create video preview for video files
+                const videoUrl = URL.createObjectURL(file);
             fileItem.innerHTML = `
+                    <div class="file-preview">
+                        <video class="video-preview" controls muted>
+                            <source src="${videoUrl}" type="${file.type}">
+                            Your browser does not support the video tag.
+                        </video>
+                    </div>
+                    <div class="file-info">
+                        <i class="fas fa-video"></i>
+                        <span>${file.name}</span>
+                        <button class="analyze-file-btn" data-file="${file.name}">Analyze</button>
+                    </div>
+                `;
+            } else if (file.type.startsWith('image/')) {
+                // Create image preview for image files
+                const imageUrl = URL.createObjectURL(file);
+                fileItem.innerHTML = `
+                    <div class="file-preview">
+                        <img class="image-preview" src="${imageUrl}" alt="${file.name}">
+                    </div>
+                    <div class="file-info">
+                        <i class="fas fa-image"></i>
+                        <span>${file.name}</span>
+                        <button class="analyze-file-btn" data-file="${file.name}">Analyze</button>
+                    </div>
+                `;
+            } else {
+                // Default file display for other types
+                fileItem.innerHTML = `
+                    <div class="file-info">
                 <i class="fas fa-file"></i>
                 <span>${file.name}</span>
                 <button class="analyze-file-btn" data-file="${file.name}">Analyze</button>
+                    </div>
             `;
+            }
+            
             fileList.appendChild(fileItem);
 
             // Add analyze button event
@@ -1395,32 +1753,32 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
         console.log('createPatientFromTriage called with:', { triageLevel, reasoning });
         
         try {
-            this.closeModal(document.getElementById('triage-modal'));
+        this.closeModal(document.getElementById('triage-modal'));
             console.log('Triage modal closed');
             
-            this.openPatientModal();
+        this.openPatientModal();
             console.log('Patient modal opened');
-            
-            // Pre-fill form with triage data
-            const triageField = document.getElementById('triage-level');
-            const notesField = document.getElementById('patient-notes');
-            
-            console.log('Setting triage level:', triageLevel, 'Field found:', !!triageField);
-            console.log('Setting notes:', reasoning, 'Field found:', !!notesField);
-            
-            if (triageField && triageLevel) {
-                // Normalize to "Red", "Yellow", etc.
-                const normalized = triageLevel.charAt(0).toUpperCase() + triageLevel.slice(1).toLowerCase();
-                triageField.value = normalized;
-                console.log('Triage level set to:', triageField.value);
-            }
-            
-            if (notesField) {
-                notesField.value = `Triage Assessment: ${reasoning}`;
-                console.log('Notes set to:', notesField.value);
-            }
-            
-            this.addSystemMessage('Patient form opened with triage data');
+        
+        // Pre-fill form with triage data
+        const triageField = document.getElementById('triage-level');
+        const notesField = document.getElementById('patient-notes');
+        
+        console.log('Setting triage level:', triageLevel, 'Field found:', !!triageField);
+        console.log('Setting notes:', reasoning, 'Field found:', !!notesField);
+        
+        if (triageField && triageLevel) {
+            // Normalize to "Red", "Yellow", etc.
+            const normalized = triageLevel.charAt(0).toUpperCase() + triageLevel.slice(1).toLowerCase();
+            triageField.value = normalized;
+            console.log('Triage level set to:', triageField.value);
+        }
+        
+        if (notesField) {
+            notesField.value = `Triage Assessment: ${reasoning}`;
+            console.log('Notes set to:', notesField.value);
+        }
+        
+        this.addSystemMessage('Patient form opened with triage data');
             console.log('createPatientFromTriage completed successfully');
         } catch (error) {
             console.error('Error in createPatientFromTriage:', error);
@@ -1650,7 +2008,7 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
 
     startVoiceInput(field = 'patient-notes') {
         // Stop any previous dictation
-        this.stopVoiceInput();
+            this.stopVoiceInput();
         this.currentVoiceField = field;
         const input = document.getElementById(field);
         if (input) {
@@ -1806,6 +2164,11 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
 
     addSystemMessage(message) {
         const content = document.getElementById('system-messages-content');
+        if (!content) {
+            console.warn('System messages content element not found');
+            return;
+        }
+        
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message system';
         messageDiv.innerHTML = `
@@ -1821,7 +2184,7 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
         if (message.includes('Welcome') || message.includes('System ready')) {
             setTimeout(() => {
                 const systemMessages = document.getElementById('system-messages');
-                if (!systemMessages.classList.contains('collapsed')) {
+                if (systemMessages && !systemMessages.classList.contains('collapsed')) {
                     systemMessages.classList.add('collapsed');
                 }
             }, 5000);
@@ -1830,8 +2193,13 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
 
     updateSystemMessagesCount() {
         const content = document.getElementById('system-messages-content');
-        const count = content.children.length;
         const countSpan = document.getElementById('system-messages-count');
+        
+        if (!content || !countSpan) {
+            return;
+        }
+        
+        const count = content.children.length;
         countSpan.textContent = `${count} message${count !== 1 ? 's' : ''}`;
     }
 
@@ -1989,6 +2357,278 @@ if (overallBtn) overallBtn.addEventListener('click', () => {
         } catch (error) {
             this.addSystemMessage('Error saving vitals');
         }
+    }
+
+    async handleMissingPersonSubmit(event) {
+        event.preventDefault();
+        
+        console.log('🔍 Missing person form submitted');
+        
+        const form = event.target;
+        const photoInput = document.getElementById('missing-person-photo-input');
+        const file = photoInput.files[0];
+        
+        // Validate that a photo is provided (this is the main requirement)
+        if (!file) {
+            this.addSystemMessage('Please upload a photo of the missing person. The photo is required for AI-powered matching.');
+            return;
+        }
+        
+        // Show progress indicator and disable form
+        const progressIndicator = document.getElementById('missing-person-progress');
+        const progressText = document.getElementById('progress-text');
+        const submitBtn = form.querySelector('button[type="submit"]');
+        
+        progressIndicator.style.display = 'block';
+        form.classList.add('form-processing');
+        submitBtn.disabled = true;
+        
+        // Helper function to update progress
+        const updateProgress = (step, text) => {
+            // Update progress text
+            progressText.textContent = text;
+            
+            // Update step indicators
+            const steps = progressIndicator.querySelectorAll('.progress-step');
+            steps.forEach((stepEl, index) => {
+                stepEl.classList.remove('active', 'completed');
+                if (index < step) {
+                    stepEl.classList.add('completed');
+                } else if (index === step) {
+                    stepEl.classList.add('active');
+                }
+            });
+        };
+        
+        try {
+            // Step 1: Uploading image
+            updateProgress(0, 'Uploading image...');
+            console.log('📸 Photo included in submission:', file.name);
+            
+            // Create FormData for multipart upload
+            const formData = new FormData();
+            
+            // Add optional fields only if they have values
+            const name = form.querySelector('#missing-person-name').value.trim();
+            const age = form.querySelector('#missing-person-age').value.trim();
+            const description = form.querySelector('#missing-person-description').value.trim();
+            const contactInfo = form.querySelector('#missing-person-contact').value.trim();
+            
+            if (name) formData.append('name', name);
+            if (age) formData.append('age', age);
+            if (description) formData.append('description', description);
+            if (contactInfo) formData.append('contact_info', contactInfo);
+            
+            formData.append('reported_by', this.currentRole || 'REUNIFICATION_COORDINATOR');
+            formData.append('photo', file);
+            
+            console.log('📋 Form data entries:');
+            for (let [key, value] of formData.entries()) {
+                if (key === 'photo') {
+                    console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
+                } else {
+                    console.log(`  ${key}: ${value}`);
+                }
+            }
+            
+            // Step 2: Extracting characteristics from image
+            updateProgress(1, 'Extracting characteristics from image...');
+            // Small delay to show the step
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Step 3: Saving to database
+            updateProgress(2, 'Saving to database...');
+            
+            const response = await fetch('/api/missing-persons', {
+                method: 'POST',
+                body: formData // Send as FormData, not JSON
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Step 4: Indexing for search
+            updateProgress(3, 'Indexing for search...');
+            // Small delay to show the indexing step
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            if (data.success) {
+                // Show completion
+                progressText.textContent = 'Report submitted successfully!';
+                progressText.style.color = '#4caf50';
+                
+                this.addSystemMessage('Missing person report submitted successfully. AI characteristics extracted for future matching.');
+                
+                // Reset form after a short delay
+                setTimeout(() => {
+                    this.closeModal(document.getElementById('missing-person-modal'));
+                    form.reset();
+                    
+                    // Reset photo preview
+                    const photoPreview = document.getElementById('photo-preview');
+                    const photoUploadArea = document.getElementById('photo-upload-area');
+                    if (photoPreview && photoUploadArea) {
+                        photoPreview.style.display = 'none';
+                        photoUploadArea.style.display = 'block';
+                    }
+                    
+                    // Hide progress indicator
+                    progressIndicator.style.display = 'none';
+                    form.classList.remove('form-processing');
+                    submitBtn.disabled = false;
+                    progressText.style.color = '';
+                }, 1500);
+            } else {
+                throw new Error(data.error || 'Unknown error');
+            }
+        } catch (error) {
+            console.error('Error submitting missing person report:', error);
+            
+            // Show error in progress
+            progressText.textContent = `Error: ${error.message}`;
+            progressText.style.color = '#f44336';
+            
+            this.addSystemMessage(`Error: ${error.message}`);
+            
+            // Reset form after error
+            setTimeout(() => {
+                progressIndicator.style.display = 'none';
+                form.classList.remove('form-processing');
+                submitBtn.disabled = false;
+                progressText.style.color = '';
+            }, 3000);
+        }
+    }
+
+    async handleFindMatchSubmit(event) {
+        event.preventDefault();
+        
+        const photoInput = document.getElementById('search-photo-input');
+        const file = photoInput.files[0];
+        
+        if (!file) {
+            this.addSystemMessage('Please select a photo to search');
+            return;
+        }
+        
+        // Show progress indicator and disable form
+        const progressIndicator = document.getElementById('find-match-progress');
+        const progressText = document.getElementById('find-match-progress-text');
+        const submitBtn = document.getElementById('search-match-btn');
+        
+        progressIndicator.style.display = 'block';
+        submitBtn.disabled = true;
+        
+        // Helper function to update progress
+        const updateProgress = (step, text) => {
+            // Update progress text
+            progressText.textContent = text;
+            
+            // Update step indicators
+            const steps = progressIndicator.querySelectorAll('.progress-step');
+            steps.forEach((stepEl, index) => {
+                stepEl.classList.remove('active', 'completed');
+                if (index < step) {
+                    stepEl.classList.add('completed');
+                } else if (index === step) {
+                    stepEl.classList.add('active');
+                }
+            });
+        };
+        
+        try {
+            // Step 1: Uploading search image
+            updateProgress(0, 'Uploading search image...');
+            
+            // Step 2: Analyzing image characteristics
+            updateProgress(1, 'Analyzing image characteristics...');
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            // Step 3: Searching database
+            updateProgress(2, 'Searching database...');
+            
+            this.addSystemMessage('Searching for matches...');
+            
+            const formData = new FormData();
+            formData.append('photo', file);
+            
+            const response = await fetch('/api/missing-persons/match', {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const data = await response.json();
+            
+            // Step 4: Finding potential matches
+            updateProgress(3, 'Finding potential matches...');
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            if (data.success) {
+                // Show completion
+                progressText.textContent = `Found ${data.matches.length} potential matches!`;
+                progressText.style.color = '#4caf50';
+                
+                this.displayMatchResults(data.matches);
+                this.addSystemMessage(`Found ${data.matches.length} potential matches`);
+                
+                // Hide progress indicator after a delay
+                setTimeout(() => {
+                    progressIndicator.style.display = 'none';
+                    submitBtn.disabled = false;
+                    progressText.style.color = '';
+                }, 2000);
+            } else {
+                throw new Error(data.error || 'Search failed');
+            }
+        } catch (error) {
+            console.error('Error finding matches:', error);
+            
+            // Show error in progress
+            progressText.textContent = `Error: ${error.message}`;
+            progressText.style.color = '#f44336';
+            
+            this.addSystemMessage(`Error: ${error.message}`);
+            
+            // Reset form after error
+            setTimeout(() => {
+                progressIndicator.style.display = 'none';
+                submitBtn.disabled = false;
+                progressText.style.color = '';
+            }, 3000);
+        }
+    }
+
+    displayMatchResults(matches) {
+        const matchResults = document.getElementById('match-results');
+        const matchList = document.getElementById('match-list');
+        
+        if (matches.length === 0) {
+            matchList.innerHTML = '<p>No potential matches found.</p>';
+        } else {
+            matchList.innerHTML = matches.map(match => `
+                <div class="match-item">
+                    <div class="match-photo">
+                        <img src="${match.image_url ? `/uploads/${match.image_url.split('/').pop()}` : '/static/images/icon-128x128.png'}" alt="Match photo">
+                    </div>
+                    <div class="match-info">
+                        <h5>${match.name}</h5>
+                        <p><strong>Age:</strong> ${match.age || 'Unknown'}</p>
+                        <p><strong>Description:</strong> ${match.description}</p>
+                        <p><strong>Similarity:</strong> ${Math.round(match.similarity_score * 100)}%</p>
+                        <p><strong>Status:</strong> ${match.status}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        matchResults.style.display = 'block';
     }
 }
 

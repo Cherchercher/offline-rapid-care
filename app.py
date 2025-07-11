@@ -4,9 +4,12 @@ import json
 import os
 from datetime import datetime
 import uuid
+from typing import Dict
 from model_manager_api import get_api_model_manager
 from database_setup import get_db_manager
+from vector_search import get_vector_search_manager
 import re
+from prompts import CHARACTERISTIC_EXTRACTION_PROMPT, VITALS_EXTRACTION_PROMPT, MEDICAL_TRIAGE_PROMPT, REUNIFICATION_SEARCH_PROMPT, DESCRIPTION_PARSING_PROMPT, AUDIO_TRANSCRIPTION_PROMPT, MEDICAL_TRANSCRIPTION_PROMPT, SOAP_SUBJECTIVE_PROMPT, SOAP_OBJECTIVE_PROMPT, SOAP_ASSESSMENT_PROMPT, SOAP_PLAN_PROMPT, GENERAL_MEDICAL_ANALYSIS_PROMPT, FALLBACK_CHARACTERISTIC_PROMPT, AI_QUERY_SYSTEM_PROMPT_TEMPLATE, TRANSCRIBE_TEXT_SYSTEM_PROMPT_TEMPLATE, AUDIO_ENHANCEMENT_PROMPT_TEMPLATE
 
 app = Flask(__name__)
 
@@ -39,6 +42,7 @@ roles = {
 }
 
 db_manager = get_db_manager()
+vector_search = get_vector_search_manager()
 
 @app.route('/')
 def index():
@@ -243,7 +247,7 @@ def analyze_frame():
                 "role": "user", 
                 "content": [
                     {"type": "image", "path": f"data:image/jpeg;base64,{frame_base64}"},
-                    {"type": "text", "text": "MANDATORY OUTPUT FORMAT - You MUST respond in exactly this structure, no exceptions:\n\n**TRIAGE LEVEL:** [RED/YELLOW/GREEN/BLACK]\n**REASONING:** [Clear explanation of triage decision based on observed conditions]\n\n**PATIENT INFORMATION:**\n- **Approximate Age:** [Estimate age range]\n- **Gender:** [Male/Female/Unknown]\n- **Mechanism of Injury:** [How the injury occurred - trauma, medical emergency, etc.]\n- **Brief Assessment Findings:** [Key observations from the frame]\n\n**TRIAGE CATEGORY DETAILS:**\n- **RED (Immediate):** Life-threatening injuries requiring immediate attention\n- **YELLOW (Delayed):** Serious injuries that can wait for treatment  \n- **GREEN (Minor):** Minor injuries that can wait or self-treat\n- **BLACK (Deceased/Expectant):** Deceased or injuries incompatible with life\n\n**IMMEDIATE ACTIONS:** [Specific steps to take based on triage level]\n\nCRITICAL: You must use the exact format above with the exact section headers. Do not provide additional medical assessment sections or deviate from this structure."}
+                    {"type": "text", "text": MEDICAL_TRIAGE_PROMPT}
                 ]
             }
         ]
@@ -378,6 +382,586 @@ def transcribe_voice():
             'error': str(e)
         }), 500
 
+@app.route('/api/search/similar-cases', methods=['POST'])
+def search_similar_cases():
+    """Search for similar medical cases using AI-powered vector search"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        limit = data.get('limit', 10)
+        filters = data.get('filters', {})
+        
+        if not query:
+            return jsonify({'error': 'No search query provided'}), 400
+        
+        # Search using vector database
+        results = vector_search.search_similar_cases(query, limit, filters)
+        
+        # Convert results to JSON-serializable format
+        search_results = []
+        for result in results:
+            search_results.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'results': search_results,
+            'query': query,
+            'total_found': len(search_results)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/medical-notes', methods=['POST'])
+def search_medical_notes():
+    """Search across medical notes using AI"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        limit = data.get('limit', 10)
+        
+        if not query:
+            return jsonify({'error': 'No search query provided'}), 400
+        
+        # Search medical notes
+        results = vector_search.search_medical_notes(query, limit)
+        
+        # Convert results to JSON-serializable format
+        search_results = []
+        for result in results:
+            search_results.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'results': search_results,
+            'query': query,
+            'total_found': len(search_results)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/recommendations', methods=['POST'])
+def get_treatment_recommendations():
+    """Get AI-powered treatment recommendations based on triage and symptoms"""
+    try:
+        data = request.json
+        triage_level = data.get('triage_level', '')
+        symptoms = data.get('symptoms', '')
+        
+        if not triage_level or not symptoms:
+            return jsonify({'error': 'Triage level and symptoms required'}), 400
+        
+        # Get recommendations
+        results = vector_search.get_case_recommendations(triage_level, symptoms)
+        
+        # Convert results to JSON-serializable format
+        recommendations = []
+        for result in results:
+            recommendations.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'recommendations': recommendations,
+            'triage_level': triage_level,
+            'symptoms': symptoms,
+            'total_found': len(recommendations)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/missing-persons', methods=['POST'])
+def search_missing_persons():
+    """Search for missing persons using AI"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        limit = data.get('limit', 10)
+        
+        if not query:
+            return jsonify({'error': 'No search query provided'}), 400
+        
+        # Search missing persons
+        results = vector_search.search_missing_persons(query, limit)
+        
+        # Convert results to JSON-serializable format
+        search_results = []
+        for result in results:
+            search_results.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'results': search_results,
+            'query': query,
+            'total_found': len(search_results)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/missing-persons-by-description', methods=['POST'])
+def search_missing_persons_by_description():
+    """Search for missing persons using family member descriptions"""
+    try:
+        data = request.json
+        description = data.get('description', '')
+        limit = data.get('limit', 10)
+        
+        if not description:
+            return jsonify({
+                'success': False,
+                'error': 'Description is required'
+            }), 400
+        
+        # Parse description to extract characteristics
+        parsed_characteristics = parse_characteristics_from_text(description)
+        
+        # Create enhanced search query
+        search_query = f"""
+        Looking for person with:
+        Physical: {parsed_characteristics.get('physical_features', {})}
+        Clothing: {parsed_characteristics.get('clothing', {})}
+        Distinctive: {parsed_characteristics.get('distinctive_features', [])}
+        Age: {parsed_characteristics.get('age_range', 'Unknown')}
+        Description: {description}
+        """
+        
+        # Use vector search to find similar missing persons
+        if db_manager.vector_search and db_manager.vector_search.is_available():
+            results = vector_search.search_missing_persons(search_query, limit)
+            
+            # Enhance results with characteristic matching
+            enhanced_results = []
+            for result in results:
+                person_characteristics = result.metadata.get('characteristics', {})
+                
+                # Calculate characteristic similarity
+                similarity_score = calculate_characteristic_similarity(
+                    parsed_characteristics, person_characteristics
+                )
+                
+                # Combine vector similarity with characteristic similarity
+                combined_score = (result.similarity_score + similarity_score) / 2
+                
+                enhanced_results.append({
+                    'id': result.id,
+                    'content': result.content,
+                    'metadata': result.metadata,
+                    'similarity_score': combined_score,
+                    'source_type': result.source_type,
+                    'characteristic_match': similarity_score
+                })
+            
+            # Sort by combined similarity score
+            enhanced_results.sort(key=lambda x: x['similarity_score'], reverse=True)
+            
+            return jsonify({
+                'success': True,
+                'results': enhanced_results,
+                'total_found': len(enhanced_results),
+                'parsed_characteristics': parsed_characteristics
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Vector search not available'
+            }), 500
+            
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+def calculate_characteristic_similarity(desc_characteristics: Dict, person_characteristics: Dict) -> float:
+    """Calculate similarity between description and person characteristics"""
+    try:
+        if not person_characteristics:
+            return 0.0
+        
+        total_score = 0.0
+        total_weight = 0.0
+        
+        # Physical features comparison
+        desc_physical = desc_characteristics.get('physical_features', {})
+        person_physical = person_characteristics.get('physical_features', {})
+        
+        physical_weights = {
+            'gender': 0.20,
+            'hair_color': 0.15,
+            'eye_color': 0.12,
+            'skin_tone': 0.10,
+            'height': 0.08,
+            'build': 0.08
+        }
+        
+        for feature, weight in physical_weights.items():
+            if feature in desc_physical and feature in person_physical:
+                if desc_physical[feature].lower() == person_physical[feature].lower():
+                    total_score += weight
+                total_weight += weight
+        
+        # Clothing comparison
+        desc_clothing = desc_characteristics.get('clothing', {})
+        person_clothing = person_characteristics.get('clothing', {})
+        
+        clothing_weights = {
+            'top': 0.08,
+            'bottom': 0.08,
+            'accessories': 0.05
+        }
+        
+        for item, weight in clothing_weights.items():
+            if item in desc_clothing and item in person_clothing:
+                if desc_clothing[item].lower() in person_clothing[item].lower() or person_clothing[item].lower() in desc_clothing[item].lower():
+                    total_score += weight
+                total_weight += weight
+        
+        # Distinctive features comparison
+        desc_distinctive = set(desc_characteristics.get('distinctive_features', []))
+        person_distinctive = set(person_characteristics.get('distinctive_features', []))
+        
+        if desc_distinctive and person_distinctive:
+            intersection = desc_distinctive.intersection(person_distinctive)
+            union = desc_distinctive.union(person_distinctive)
+            distinctive_score = len(intersection) / len(union) if union else 0.0
+            total_score += distinctive_score * 0.12
+            total_weight += 0.12
+        
+        # Age range comparison
+        desc_age = desc_characteristics.get('age_range', '')
+        person_age = person_characteristics.get('age_range', '')
+        
+        if desc_age and person_age and desc_age != 'Unknown' and person_age != 'Unknown':
+            # Simple age range overlap calculation
+            try:
+                desc_range = [int(x) for x in desc_age.replace('+', '').split('-')]
+                person_range = [int(x) for x in person_age.replace('+', '').split('-')]
+                
+                if len(desc_range) == 2 and len(person_range) == 2:
+                    overlap = min(desc_range[1], person_range[1]) - max(desc_range[0], person_range[0])
+                    if overlap > 0:
+                        age_score = overlap / max(desc_range[1] - desc_range[0], person_range[1] - person_range[0])
+                        total_score += age_score * 0.10
+                        total_weight += 0.10
+            except:
+                pass
+        
+        return total_score / total_weight if total_weight > 0 else 0.0
+        
+    except Exception as e:
+        print(f"❌ Error calculating characteristic similarity: {e}")
+        return 0.0
+
+@app.route('/api/search/reunification-matches', methods=['POST'])
+def find_reunification_matches():
+    """Find potential matches for reunification"""
+    try:
+        data = request.json
+        person_data = data.get('person_data', {})
+        limit = data.get('limit', 5)
+        
+        if not person_data:
+            return jsonify({'error': 'Person data required'}), 400
+        
+        # Find potential matches
+        results = vector_search.find_potential_matches(person_data, limit)
+        
+        # Convert results to JSON-serializable format
+        matches = []
+        for result in results:
+            matches.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'matches': matches,
+            'total_found': len(matches)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/patients-reunification', methods=['POST'])
+def search_patients_for_reunification():
+    """Search patients for reunification purposes"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        limit = data.get('limit', 10)
+        
+        if not query:
+            return jsonify({'error': 'No search query provided'}), 400
+        
+        # Search patients for reunification
+        results = vector_search.search_patients_for_reunification(query, limit)
+        
+        # Convert results to JSON-serializable format
+        search_results = []
+        for result in results:
+            search_results.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'results': search_results,
+            'query': query,
+            'total_found': len(search_results)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/reunification-recommendations', methods=['POST'])
+def get_reunification_recommendations():
+    """Get AI-powered reunification recommendations"""
+    try:
+        data = request.json
+        person_type = data.get('person_type', '')
+        description = data.get('description', '')
+        
+        if not person_type or not description:
+            return jsonify({'error': 'Person type and description required'}), 400
+        
+        # Get reunification recommendations
+        results = vector_search.get_reunification_recommendations(person_type, description)
+        
+        # Convert results to JSON-serializable format
+        recommendations = []
+        for result in results:
+            recommendations.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'recommendations': recommendations,
+            'person_type': person_type,
+            'description': description,
+            'total_found': len(recommendations)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/search/similar-patients', methods=['POST'])
+def find_similar_patients():
+    """Find patients with similar conditions"""
+    try:
+        data = request.json
+        patient_data = data.get('patient_data', {})
+        limit = data.get('limit', 5)
+        
+        if not patient_data:
+            return jsonify({'error': 'Patient data required'}), 400
+        
+        # Find similar patients
+        results = vector_search.find_similar_patients(patient_data, limit)
+        
+        # Convert results to JSON-serializable format
+        similar_patients = []
+        for result in results:
+            similar_patients.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'similar_patients': similar_patients,
+            'total_found': len(similar_patients)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+
+@app.route('/api/search/ai-query', methods=['POST'])
+def ai_powered_query():
+    """AI-powered natural language query interface"""
+    try:
+        data = request.json
+        query = data.get('query', '')
+        user_role = data.get('role', 'PARAMEDIC')
+        
+        if not query:
+            return jsonify({'error': 'No query provided'}), 400
+        
+        # Use AI to understand the query and generate search strategy
+        system_prompt = AI_QUERY_SYSTEM_PROMPT_TEMPLATE.format(role=user_role.lower(), query=query)
+        
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": query}
+        ]
+        
+        # Get AI analysis
+        result = model_manager.chat(messages)
+        
+        if not result['success']:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to analyze query'
+            }), 500
+        
+        # Parse AI response
+        try:
+            ai_analysis = json.loads(result['response'])
+        except:
+            # Fallback to simple search
+            ai_analysis = {
+                "search_type": "similar_cases",
+                "search_query": query,
+                "filters": {},
+                "explanation": "Fallback search"
+            }
+        
+        # Execute the recommended search
+        search_results = []
+        if ai_analysis['search_type'] == 'missing_persons':
+            search_results = vector_search.search_missing_persons(
+                ai_analysis['search_query'], 
+                10
+            )
+        elif ai_analysis['search_type'] == 'patients':
+            search_results = vector_search.search_patients_for_reunification(
+                ai_analysis['search_query'], 
+                10
+            )
+        elif ai_analysis['search_type'] == 'matches':
+            # Create person data from query
+            person_data = {
+                'name': 'Unknown',
+                'description': ai_analysis['search_query'],
+                'status': 'missing'
+            }
+            search_results = vector_search.find_potential_matches(
+                person_data, 
+                5
+            )
+        elif ai_analysis['search_type'] == 'reunification_protocols':
+            # Extract person type and description from query
+            search_results = vector_search.get_reunification_recommendations(
+                ai_analysis.get('filters', {}).get('person_type', 'adult'),
+                ai_analysis['search_query']
+            )
+        elif ai_analysis['search_type'] == 'medical_notes':
+            search_results = vector_search.search_medical_notes(
+                ai_analysis['search_query'], 
+                10
+            )
+        
+        # Convert results
+        results_data = []
+        for result in search_results:
+            results_data.append({
+                'id': result.id,
+                'content': result.content,
+                'metadata': result.metadata,
+                'similarity_score': result.similarity_score,
+                'source_type': result.source_type
+            })
+        
+        return jsonify({
+            'success': True,
+            'ai_analysis': ai_analysis,
+            'results': results_data,
+            'total_found': len(results_data)
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/voice/transcribe-text', methods=['POST'])
 def transcribe_text():
     """Process text transcription from frontend Web Speech API"""
@@ -390,26 +974,7 @@ def transcribe_text():
             return jsonify({'error': 'No transcription provided'}), 400
         
         # Use Ollama to enhance/process the transcription with triage requirements
-        system_prompt = f"""You are a {user_role.lower()} in an emergency response system. 
-        
-        CRITICAL REQUIREMENTS:
-        1. ALWAYS provide a triage category (RED, YELLOW, GREEN, BLACK) at the beginning of your response
-        2. ALWAYS provide clear reasoning for your triage decision
-        3. ALWAYS provide specific actionable steps for the situation
-        4. Use medical triage protocols and emergency response procedures
-        
-        TRIAGE CATEGORIES:
-        - RED (Immediate): Life-threatening injuries requiring immediate attention
-        - YELLOW (Delayed): Serious injuries that can wait for treatment
-        - GREEN (Minor): Minor injuries that can wait or self-treat
-        - BLACK (Deceased/Expectant): Deceased or injuries incompatible with life
-        
-        Process this audio transcription and provide medical insights with triage categorization.
-        If the transcription is unclear, ask for clarification.
-        Focus on medical terminology, patient information, and emergency details.
-        
-        Format your response as:
-        **Triage: [CATEGORY]** **Reasoning:** [Clear explanation] **Action:** [Specific steps]"""
+        system_prompt = TRANSCRIBE_TEXT_SYSTEM_PROMPT_TEMPLATE.format(role=user_role.lower())
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -669,9 +1234,7 @@ def transcribe_audio_with_ollama(audio_path, user_role):
             pass
         
         # Use Ollama to enhance/process the transcription
-        system_prompt = f"""You are a {user_role.lower()} in an emergency response system. 
-        Process this audio transcription and provide medical insights. If the transcription is unclear,
-        ask for clarification. Focus on medical terminology, patient information, and emergency details."""
+        system_prompt = AUDIO_ENHANCEMENT_PROMPT_TEMPLATE.format(role=user_role.lower())
         
         messages = [
             {"role": "system", "content": system_prompt},
@@ -842,6 +1405,129 @@ def switch_model_mode():
             'error': str(e)
         }), 500
 
+def extract_person_characteristics(image_path: str) -> Dict:
+    """Extract structured characteristics from a person's image"""
+    try:
+        # Create image URL for model analysis - use uploads server
+        image_url = f"http://127.0.0.1:11435/{os.path.basename(image_path)}"
+        
+        # Detailed prompt for characteristic extraction
+        prompt = CHARACTERISTIC_EXTRACTION_PROMPT
+        
+        # Prepare messages for chat_image method
+        messages = [
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image",
+                        "url": image_url
+                    },
+                    {
+                        "type": "text",
+                        "text": prompt
+                    }
+                ]
+            }
+        ]
+        
+        # Use model manager to analyze image
+        result = model_manager.chat_image(messages)
+        
+        if result['success']:
+            try:
+                # Parse JSON response - handle markdown code blocks
+                import json
+                import re
+                
+                response_text = result['response']
+                
+                # Try to extract JSON from markdown code blocks first
+                json_match = re.search(r'```(?:json)?\s*(\{.*?\})\s*```', response_text, re.DOTALL)
+                if json_match:
+                    characteristics = json.loads(json_match.group(1))
+                    print(f"📸 Successfully parsed JSON from markdown: {characteristics}")
+                    return characteristics
+                
+                # Try direct JSON parsing
+                characteristics = json.loads(response_text)
+                print(f"📸 Successfully parsed direct JSON: {characteristics}")
+                return characteristics
+                
+            except json.JSONDecodeError as e:
+                print(f"⚠️  JSON parsing failed: {e}")
+                print(f"📸 Raw response: {result['response']}")
+                # Fallback: try to extract from text
+                return parse_characteristics_from_text(result['response'])
+        else:
+            print(f"❌ Image analysis failed: {result.get('error', 'Unknown error')}")
+            return {}
+            
+    except Exception as e:
+        print(f"❌ Error extracting characteristics: {e}")
+        return {}
+
+def parse_characteristics_from_text(text: str) -> Dict:
+    """Parse characteristics from unstructured text as fallback"""
+    characteristics = {
+        'physical_features': {},
+        'clothing': {},
+        'distinctive_features': [],
+        'age_range': 'Unknown'
+    }
+    
+    try:
+        # Simple parsing logic for common patterns
+        text_lower = text.lower()
+        
+        # Extract age patterns
+        import re
+        age_match = re.search(r'(\d+)[-\s]*(\d+)?\s*(?:years?|y\.?o\.?)', text_lower)
+        if age_match:
+            if age_match.group(2):
+                characteristics['age_range'] = f"{age_match.group(1)}-{age_match.group(2)}"
+            else:
+                age = int(age_match.group(1))
+                characteristics['age_range'] = f"{age-5}-{age+5}"
+        
+        # Extract gender
+        if 'male' in text_lower or 'man' in text_lower or 'boy' in text_lower or 'father' in text_lower or 'husband' in text_lower or 'son' in text_lower:
+            characteristics['physical_features']['gender'] = 'male'
+        elif 'female' in text_lower or 'woman' in text_lower or 'girl' in text_lower or 'mother' in text_lower or 'wife' in text_lower or 'daughter' in text_lower:
+            characteristics['physical_features']['gender'] = 'female'
+        
+        # Extract hair color
+        hair_colors = ['black', 'brown', 'blonde', 'red', 'gray', 'white']
+        for color in hair_colors:
+            if color in text_lower:
+                characteristics['physical_features']['hair_color'] = color
+                break
+        
+        # Extract eye color
+        eye_colors = ['brown', 'blue', 'green', 'hazel', 'gray']
+        for color in eye_colors:
+            if color in text_lower:
+                characteristics['physical_features']['eye_color'] = color
+                break
+        
+        # Extract clothing
+        if 'shirt' in text_lower or 't-shirt' in text_lower:
+            characteristics['clothing']['top'] = 'shirt'
+        if 'pants' in text_lower or 'jeans' in text_lower:
+            characteristics['clothing']['bottom'] = 'pants'
+        
+        # Extract distinctive features
+        distinctive_keywords = ['scar', 'birthmark', 'tattoo', 'piercing', 'glasses']
+        for keyword in distinctive_keywords:
+            if keyword in text_lower:
+                characteristics['distinctive_features'].append(keyword)
+        
+        return characteristics
+        
+    except Exception as e:
+        print(f"❌ Error parsing characteristics from text: {e}")
+        return characteristics
+
 def log_interaction(role, user_message, assistant_message, patient_id=None):
     """Log interactions for audit trail"""
     log_entry = {
@@ -870,20 +1556,57 @@ def missing_persons_api():
         
         elif request.method == 'POST':
             # Add new missing person
-            data = request.json
             print("--- Incoming missing person data ---")
-            print(data)
             
-            # Save image if provided
-            image_path = None
-            if 'image_data' in data and data['image_data']:
-                import base64
-                image_data = base64.b64decode(data['image_data'].split(',')[1])
-                filename = f"missing_person_{uuid.uuid4()}.jpg"
-                image_path = os.path.join('uploads', filename)
+            # Handle both JSON and FormData
+            if request.content_type and 'multipart/form-data' in request.content_type:
+                # Handle file upload
+                data = {
+                    'name': request.form.get('name', ''),
+                    'age': request.form.get('age'),
+                    'description': request.form.get('description', ''),
+                    'contact_info': request.form.get('contact_info', ''),
+                    'reported_by': request.form.get('reported_by', 'REUNIFICATION_COORDINATOR')
+                }
                 
-                with open(image_path, 'wb') as f:
-                    f.write(image_data)
+                # Handle photo upload
+                image_path = None
+                if 'photo' in request.files:
+                    file = request.files['photo']
+                    if file and file.filename != '':
+                        filename = f"missing_person_{uuid.uuid4()}{os.path.splitext(file.filename)[1]}"
+                        image_path = os.path.join('uploads', filename)
+                        file.save(image_path)
+                        print(f"📸 Photo saved: {image_path}")
+                    else:
+                        print("📸 No photo file provided")
+                else:
+                    print("📸 No photo field in request")
+            else:
+                # Handle JSON data (legacy)
+                data = request.json
+                print(data)
+                
+                # Save image if provided as base64
+                image_path = None
+                if 'image_data' in data and data['image_data']:
+                    import base64
+                    image_data = base64.b64decode(data['image_data'].split(',')[1])
+                    filename = f"missing_person_{uuid.uuid4()}.jpg"
+                    image_path = os.path.join('uploads', filename)
+                    
+                    with open(image_path, 'wb') as f:
+                        f.write(image_data)
+            
+            # Extract characteristics from image if provided
+            characteristics = {}
+            if image_path:
+                try:
+                    characteristics = extract_person_characteristics(image_path)
+                    print(f"📸 Extracted characteristics: {characteristics}")
+                except Exception as e:
+                    print(f"⚠️  Failed to extract characteristics: {e}")
+                    characteristics = {}
             
             # Prepare person data
             person_data = {
@@ -893,7 +1616,8 @@ def missing_persons_api():
                 'image_path': image_path,
                 'contact_info': data.get('contact_info', ''),
                 'reported_by': data.get('reported_by', 'REUNIFICATION_COORDINATOR'),
-                'status': 'missing'
+                'status': 'missing',
+                'characteristics': characteristics
             }
             
             person_id = db_manager.add_missing_person(person_data)
@@ -909,6 +1633,61 @@ def missing_persons_api():
         traceback.print_exc()
         print(f"--- Exception in missing_persons_api ---")
         print(f"Traceback (most recent call last):")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/missing-persons/match', methods=['POST'])
+def missing_persons_match():
+    """Find potential matches for a missing person using photo"""
+    try:
+        if 'photo' not in request.files:
+            return jsonify({'error': 'No photo file provided'}), 400
+        
+        file = request.files['photo']
+        if file.filename == '':
+            return jsonify({'error': 'No photo file selected'}), 400
+        
+        # Save uploaded image
+        filename = f"search_image_{uuid.uuid4()}.jpg"
+        image_path = os.path.join('uploads', filename)
+        file.save(image_path)
+        
+        # Find matches using database manager
+        matches = db_manager.find_missing_person_match(image_path)
+        
+        # Enhance matches with proper image URLs
+        enhanced_matches = []
+        for match in matches:
+            enhanced_match = match.copy()
+            
+            # Add proper image URL if image exists
+            if match.get('image_path') and os.path.exists(match['image_path']):
+                image_filename = os.path.basename(match['image_path'])
+                enhanced_match['image_url'] = f"/uploads/{image_filename}"
+            else:
+                enhanced_match['image_url'] = None
+            
+            # Ensure all required fields are present
+            enhanced_match['name'] = match.get('name', 'Unknown')
+            enhanced_match['age'] = match.get('age', 'Unknown')
+            enhanced_match['description'] = match.get('description', 'No description available')
+            enhanced_match['status'] = match.get('status', 'missing')
+            enhanced_match['similarity_score'] = match.get('similarity_score', 0.0)
+            
+            enhanced_matches.append(enhanced_match)
+        
+        return jsonify({
+            'success': True,
+            'matches': enhanced_matches,
+            'search_image_path': image_path,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({
             'success': False,
             'error': str(e)
@@ -956,7 +1735,7 @@ def transcribe_audio():
             return jsonify({'error': 'No audio file provided'}), 400
         
         file = request.files['file']
-        prompt = request.form.get('prompt', 'Transcribe this audio accurately')
+        prompt = request.form.get('prompt', AUDIO_TRANSCRIPTION_PROMPT)
         user_role = request.form.get('role', 'PARAMEDIC')
         
         if file.filename == '':
@@ -1047,29 +1826,7 @@ def vitals_api():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/vitals/extract', methods=['POST'])
-def extract_vitals_from_transcription():
-    data = request.json
-    transcription = data.get('transcription', '')
-    # Use regex to extract vitals
-    def extract(pattern, text, group=1):
-        m = re.search(pattern, text, re.IGNORECASE)
-        return m.group(group) if m else None
-    result = {
-        'heart_rate': extract(r'heart rate(?: is|:)?\s*(\d+)', transcription),
-        'bp_sys': None,
-        'bp_dia': None,
-        'resp_rate': extract(r'respiratory rate(?: is|:)?\s*(\d+)', transcription),
-        'o2_sat': extract(r'(?:o2|oxygen saturation)(?: is|:)?\s*(\d+)', transcription),
-        'temperature': extract(r'temperature(?: is|:)?\s*(\d+(?:\.\d+)?)', transcription),
-        'pain_score': extract(r'pain score(?: is|:)?\s*(\d+)', transcription)
-    }
-    # Blood pressure: look for "blood pressure 120 over 80" or "blood pressure is 120/80"
-    bp_match = re.search(r'blood pressure(?: is|:)?\s*(\d+)[^\d]+(\d+)', transcription, re.IGNORECASE)
-    if bp_match:
-        result['bp_sys'] = bp_match.group(1)
-        result['bp_dia'] = bp_match.group(2)
-    return jsonify({'success': True, 'vitals': result})
+
 
 if __name__ == '__main__':
     # For development, you can use a self-signed certificate

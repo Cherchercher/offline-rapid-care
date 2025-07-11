@@ -9,6 +9,7 @@ from PIL import Image
 import base64
 from io import BytesIO
 from urllib.parse import urljoin
+from prompts import AUDIO_TRANSCRIPTION_PROMPT
 
 class ModelManager:
     """Manages both direct model loading and Ollama API modes"""
@@ -106,13 +107,13 @@ class ModelManager:
                     print(f"⚠️  Full precision failed: {e2}")
                     # Strategy 3: Auto device mapping
                     print("🔄 Trying auto device mapping...")
-                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
+            self.direct_model = AutoModelForImageTextToText.from_pretrained(
                         local_model_path, 
-                        torch_dtype="auto", 
+                torch_dtype="auto", 
                         device_map="auto",
                         trust_remote_code=True,
                         low_cpu_mem_usage=True
-                    )
+            )
                     print("✅ Model loaded with auto device mapping")
                     print(f"🔊 Model dtype: {next(self.direct_model.parameters()).dtype}")
             
@@ -425,13 +426,13 @@ class ModelManager:
                 )
             else:
                 print(f"🔊 No images found, using text-only chat template")
-                input_ids = self.direct_processor.apply_chat_template(
-                    messages,
-                    add_generation_prompt=True,
-                    tokenize=True,
-                    return_dict=True,
-                    return_tensors="pt"
-                )
+            input_ids = self.direct_processor.apply_chat_template(
+                messages,
+                add_generation_prompt=True,
+                tokenize=True,
+                return_dict=True,
+                return_tensors="pt"
+            )
             
             # Move to CPU with the same dtype as the model
             model_dtype = next(self.direct_model.parameters()).dtype
@@ -506,7 +507,7 @@ class ModelManager:
         pil_image = Image.fromarray(image)
         
         # Convert to base64
-        buffer = io.BytesIO()
+        buffer = BytesIO()
         pil_image.save(buffer, format='PNG')
         img_str = base64.b64encode(buffer.getvalue()).decode()
         
@@ -568,7 +569,7 @@ class ModelManager:
                 'response': f'Error analyzing image: {str(e)}'
             }
 
-    def transcribe_audio_with_url(self, audio_url: str, prompt: str = "Transcribe this audio and complete the statement") -> Dict:
+    def transcribe_audio_with_url(self, audio_url: str, prompt: str = AUDIO_TRANSCRIPTION_PROMPT) -> Dict:
         """Transcribe audio using URL with Gemma 3n"""
         try:
             messages = [
@@ -621,7 +622,7 @@ class ModelManager:
                 'response': f'Error transcribing audio: {str(e)}'
             }
 
-    def transcribe_audio_file(self, audio_file_path: str, prompt: str = "Transcribe this audio accurately") -> Dict:
+    def transcribe_audio_file(self, audio_file_path: str, prompt: str = AUDIO_TRANSCRIPTION_PROMPT) -> Dict:
         """Transcribe audio file using Gemma 3n"""
         try:
             # For Ollama, we need to send the audio as a URL that Ollama can access

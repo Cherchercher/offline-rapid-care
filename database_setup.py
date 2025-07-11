@@ -13,6 +13,16 @@ from datetime import datetime, timezone
 import uuid
 from typing import Dict, List, Optional, Any
 import logging
+import threading
+import time
+from prompts import CHARACTERISTIC_EXTRACTION_PROMPT
+
+# Import vector search (optional)
+try:
+    from vector_search import get_vector_search_manager
+    VECTOR_SEARCH_AVAILABLE = True
+except ImportError:
+    VECTOR_SEARCH_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -37,6 +47,16 @@ class DatabaseManager:
         self.sqlite_path = sqlite_path
         self.sync_enabled = sync_enabled
         self.online_available = False
+        
+        # Initialize vector search if available
+        self.vector_search = None
+        if VECTOR_SEARCH_AVAILABLE:
+            try:
+                self.vector_search = get_vector_search_manager()
+                logger.info("✅ Vector search initialized")
+            except Exception as e:
+                logger.warning(f"⚠️  Vector search not available: {e}")
+                self.vector_search = None
         
         # Initialize databases
         self._init_sqlite()
@@ -395,6 +415,13 @@ class DatabaseManager:
             # Add to sync queue
             self._add_to_sync_queue('patients', patient_id, 'INSERT', patient_record)
             
+            # Index for vector search if available
+            if self.vector_search and self.vector_search.is_available():
+                try:
+                    self.vector_search.index_patient(patient_record)
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to index patient for search: {e}")
+            
             logger.info(f"✅ Patient {patient_id} added to offline database")
             
         except Exception as e:
@@ -481,6 +508,13 @@ class DatabaseManager:
             
             # Add to sync queue
             self._add_to_sync_queue('soap_notes', soap_id, 'INSERT', soap_record)
+            
+            # Index for vector search if available
+            if self.vector_search and self.vector_search.is_available():
+                try:
+                    self.vector_search.index_soap_note(soap_record)
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to index SOAP note for search: {e}")
             
             logger.info(f"✅ SOAP note {soap_id} added for patient {soap_data.get('patient_id')}")
             
@@ -687,6 +721,13 @@ class DatabaseManager:
             # Add to sync queue
             self._add_to_sync_queue('missing_persons', person_id, 'INSERT', person_data)
             
+            # Index for vector search if available
+            if self.vector_search and self.vector_search.is_available():
+                try:
+                    self.vector_search.index_missing_person(person_data)
+                except Exception as e:
+                    logger.warning(f"⚠️  Failed to index missing person for search: {e}")
+            
             logger.info(f"✅ Missing person {person_id} added to offline database")
             return person_id
             
@@ -707,9 +748,10 @@ class DatabaseManager:
             """, (limit,))
             
             rows = cursor.fetchall()
+            columns = [description[0] for description in cursor.description]
             conn.close()
             
-            return [dict(row) for row in rows]
+            return [dict(zip(columns, row)) for row in rows]
             
         except Exception as e:
             logger.error(f"Error getting missing persons: {e}")
@@ -748,28 +790,7 @@ class DatabaseManager:
             model_manager = get_model_manager()
             
             # Generate structured descriptions for both images
-            prompt = """Analyze this person and provide a structured description in the following format:
-            
-            **Physical Features:**
-            - Face shape: [round/oval/square/heart]
-            - Hair: [color, length, style]
-            - Eyes: [color, shape]
-            - Skin tone: [light/medium/dark]
-            - Height: [estimated]
-            - Build: [slim/average/stocky]
-            
-            **Clothing:**
-            - Top: [color, type]
-            - Bottom: [color, type]
-            - Accessories: [glasses, jewelry, etc.]
-            
-            **Distinctive Features:**
-            - [Any unique characteristics, scars, tattoos, etc.]
-            
-            **Age Range:**
-            - [estimated age range]
-            
-            Provide only the structured description, no additional text."""
+            prompt = CHARACTERISTIC_EXTRACTION_PROMPT
             
             # Create image URLs (use uploads server port)
             image1_url = f"http://127.0.0.1:11435/{image1_path}"

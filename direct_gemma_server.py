@@ -10,6 +10,7 @@ import os
 import json
 from datetime import datetime
 import uuid
+from prompts import AUDIO_TRANSCRIPTION_PROMPT
 
 app = Flask(__name__)
 
@@ -53,7 +54,7 @@ def transcribe_audio():
             return jsonify({'error': 'No audio file provided'}), 400
         
         file = request.files['file']
-        prompt = request.form.get('prompt', 'Transcribe this audio accurately')
+        prompt = request.form.get('prompt', AUDIO_TRANSCRIPTION_PROMPT)
         
         if file.filename == '':
             return jsonify({'error': 'No audio file selected'}), 400

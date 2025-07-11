@@ -57,7 +57,7 @@ curl -X POST http://localhost:5001/chat/audio \
     "messages": [
       {"role": "user", "content": [
         {"type": "audio", "audio": "./uploads/audio_f60a5896-f4a4-4eec-97f8-d7f57c396d60_converted.wav"},
-        {"type": "text", "text": "Transcribe this audio accurately."}
+        {"type": "text", "text": "Transcribe this audio accurately, preserving medical terminology and patient information."}
       ]}
     ]
   }'

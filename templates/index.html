@@ -198,6 +198,18 @@
                         </button>
                     </div>
 
+                    <div class="action-card" data-action="ai-search">
+                        <div class="action-icon">
+                            <i class="fas fa-search"></i>
+                        </div>
+                        <h3>AI Search</h3>
+                        <p>Search medical records and get AI-powered insights</p>
+                        <button class="action-btn">
+                            <i class="fas fa-brain"></i>
+                            Search Records
+                        </button>
+                    </div>
+
                     <div class="action-card" data-action="create-patient">
                         <div class="action-icon">
                             <i class="fas fa-user-plus"></i>
@@ -407,6 +419,47 @@
             </div>
         </div>
 
+        <!-- AI Search Modal -->
+        <div id="ai-search-modal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>AI-Powered Description Search</h3>
+                    <button class="close-btn">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="search-container">
+                        <div class="form-group">
+                            <label for="description-search-input">Describe the missing person:</label>
+                            <textarea id="description-search-input" placeholder="Describe physical features, clothing, distinctive characteristics... Example: 'My brother is about 5'8", brown hair, blue eyes, wearing a red shirt and blue jeans, has a scar on his left cheek'" rows="4"></textarea>
+                        </div>
+                        <div class="search-examples">
+                            <p><strong>Example descriptions:</strong></p>
+                            <ul>
+                                <li>"My daughter is 10 years old, blonde hair, blue eyes, wearing a pink dress"</li>
+                                <li>"My father is elderly, gray hair, glasses, wearing a blue jacket"</li>
+                                <li>"My friend is 25, black hair, brown eyes, tattoo on right arm, wearing jeans"</li>
+                            </ul>
+                        </div>
+                        <button id="description-search-btn" class="btn-primary">
+                            <i class="fas fa-search"></i>
+                            Search by Description
+                        </button>
+                    </div>
+                    
+                    <div class="search-results" id="search-results">
+                        <!-- Search results will be displayed here -->
+                    </div>
+                    
+                    <div class="modal-actions">
+                        <button id="close-ai-search-btn" class="btn-secondary">
+                            <i class="fas fa-times"></i>
+                            Close
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Vitals Entry Modal -->
         <div id="vitals-modal" class="modal">
             <div class="modal-content">
@@ -460,7 +513,7 @@
                         <div class="form-group">
                             <label for="vitals-pain-score">Pain Score (0-10):</label>
                             <div class="notes-input-container">
-                                <input type="number" id="vitals-pain-score" min="0" max="10" step="1" required>
+                                <input type="number" id="vitals-pain-score" min="0" max="10" step="1">
                                 <button id="vitals-pain-score-voice-btn" class="notes-voice-btn" title="Voice Input"><i class="fas fa-microphone"></i></button>
                             </div>
                         </div>
@@ -517,22 +570,26 @@
                     <button class="close-btn">&times;</button>
                 </div>
                 <div class="modal-body">
+                    <div class="form-note">
+                        <i class="fas fa-info-circle"></i>
+                        <strong>Note:</strong> Only a photo is required. AI will automatically extract physical characteristics for matching. Additional information helps but is optional.
+                    </div>
                     <form id="missing-person-form">
                         <div class="form-group">
                             <label for="missing-person-name">Name:</label>
-                            <input type="text" id="missing-person-name" placeholder="Full name" required>
+                            <input type="text" id="missing-person-name" name="name" placeholder="Full name (optional)">
                         </div>
                         <div class="form-group">
                             <label for="missing-person-age">Age:</label>
-                            <input type="number" id="missing-person-age" placeholder="Age in years">
+                            <input type="number" id="missing-person-age" name="age" placeholder="Age in years (optional)">
                         </div>
                         <div class="form-group">
                             <label for="missing-person-description">Description:</label>
-                            <textarea id="missing-person-description" placeholder="Physical description, clothing, distinctive features..." required></textarea>
+                            <textarea id="missing-person-description" name="description" placeholder="Physical description, clothing, distinctive features... (optional)"></textarea>
                         </div>
                         <div class="form-group">
                             <label for="missing-person-contact">Contact Information:</label>
-                            <input type="text" id="missing-person-contact" placeholder="Phone number, email, or other contact">
+                            <input type="text" id="missing-person-contact" name="contact_info" placeholder="Phone number, email, or other contact">
                         </div>
                         <div class="form-group">
                             <label for="missing-person-photo">Photo:</label>
@@ -548,7 +605,36 @@
                                 </button>
                             </div>
                         </div>
-                        <button type="submit" class="btn-primary">Submit Report</button>
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-upload"></i>
+                            Submit Report (Photo Required)
+                        </button>
+                        
+                        <!-- Progress Indicator -->
+                        <div id="missing-person-progress" class="progress-indicator" style="display: none;">
+                            <div class="progress-header">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span id="progress-text">Processing...</span>
+                            </div>
+                            <div class="progress-steps">
+                                <div class="progress-step" data-step="upload">
+                                    <i class="fas fa-upload"></i>
+                                    <span>Uploading image...</span>
+                                </div>
+                                <div class="progress-step" data-step="extract">
+                                    <i class="fas fa-brain"></i>
+                                    <span>Extracting characteristics...</span>
+                                </div>
+                                <div class="progress-step" data-step="save">
+                                    <i class="fas fa-save"></i>
+                                    <span>Saving to database...</span>
+                                </div>
+                                <div class="progress-step" data-step="index">
+                                    <i class="fas fa-search"></i>
+                                    <span>Indexing for search...</span>
+                                </div>
+                            </div>
+                        </div>
                     </form>
                 </div>
             </div>
@@ -562,23 +648,51 @@
                     <button class="close-btn">&times;</button>
                 </div>
                 <div class="modal-body">
-                    <div class="form-group">
-                        <label for="search-photo">Upload Photo to Search:</label>
-                        <div class="photo-upload-area" id="search-photo-upload-area">
-                            <i class="fas fa-search"></i>
-                            <p>Click to upload photo for matching</p>
-                            <input type="file" id="search-photo-input" accept="image/*" style="display: none;">
+                    <form id="find-match-form">
+                        <div class="form-group">
+                            <label for="search-photo">Upload Photo to Search:</label>
+                            <div class="photo-upload-area" id="search-photo-upload-area">
+                                <i class="fas fa-search"></i>
+                                <p>Click to upload photo for matching</p>
+                                <input type="file" id="search-photo-input" accept="image/*" style="display: none;">
+                            </div>
+                            <div id="search-photo-preview" class="photo-preview" style="display: none;">
+                                <img id="search-photo-preview-img" src="" alt="Search photo preview">
+                                <button type="button" id="remove-search-photo-btn" class="btn-secondary">
+                                    <i class="fas fa-times"></i> Remove
+                                </button>
+                            </div>
                         </div>
-                        <div id="search-photo-preview" class="photo-preview" style="display: none;">
-                            <img id="search-photo-preview-img" src="" alt="Search photo preview">
-                            <button type="button" id="remove-search-photo-btn" class="btn-secondary">
-                                <i class="fas fa-times"></i> Remove
-                            </button>
+                        <button type="submit" id="search-match-btn" class="btn-primary" disabled>
+                            <i class="fas fa-search"></i> Search for Matches
+                        </button>
+                        
+                        <!-- Progress Indicator -->
+                        <div id="find-match-progress" class="progress-indicator" style="display: none;">
+                            <div class="progress-header">
+                                <i class="fas fa-spinner fa-spin"></i>
+                                <span id="find-match-progress-text">Processing...</span>
+                            </div>
+                            <div class="progress-steps">
+                                <div class="progress-step" data-step="upload">
+                                    <i class="fas fa-upload"></i>
+                                    <span>Uploading search image...</span>
+                                </div>
+                                <div class="progress-step" data-step="analyze">
+                                    <i class="fas fa-brain"></i>
+                                    <span>Analyzing image characteristics...</span>
+                                </div>
+                                <div class="progress-step" data-step="search">
+                                    <i class="fas fa-search"></i>
+                                    <span>Searching database...</span>
+                                </div>
+                                <div class="progress-step" data-step="match">
+                                    <i class="fas fa-users"></i>
+                                    <span>Finding potential matches...</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    <button id="search-match-btn" class="btn-primary" disabled>
-                        <i class="fas fa-search"></i> Search for Matches
-                    </button>
+                    </form>
                     
                     <div id="match-results" class="match-results" style="display: none;">
                         <h4>Potential Matches</h4>
@@ -679,6 +793,7 @@
     </div>
 
     <!-- Scripts -->
+    <script src="/static/js/prompts.js"></script>
     <script src="/static/js/app.js?v=3"></script>
     <script src="/static/js/sw.js"></script>
 </body>

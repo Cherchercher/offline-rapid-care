@@ -32,3 +32,7 @@ pydub>=0.25.1
 
 # Ollama client
 ollama>=0.1.7
+
+# Vector search and embeddings
+chromadb>=0.4.0
+sentence-transformers>=2.2.0

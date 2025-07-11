@@ -2,6 +2,7 @@ import requests
 import json
 from typing import Dict, List, Optional
 import time
+from prompts import AUDIO_TRANSCRIPTION_PROMPT
 
 class ModelManagerAPI:
     """Model manager that communicates with the model API server"""
@@ -269,7 +270,7 @@ class ModelManagerAPI:
                 'mode': 'api-video'
             }
     
-    def transcribe_audio_file(self, audio_file_path: str, prompt: str = "Transcribe this audio accurately") -> Dict:
+    def transcribe_audio_file(self, audio_file_path: str, prompt: str = AUDIO_TRANSCRIPTION_PROMPT) -> Dict:
         """
         Transcribe audio file using the new API architecture
         
@@ -311,20 +312,22 @@ class ModelManagerAPI:
             return self.chat_text(messages)
     
     def get_status(self) -> Dict:
-        """Get current model status from API server"""
+        """Get status of the model API server"""
         try:
             response = requests.get(self.status_url, timeout=5)
             if response.status_code == 200:
                 return response.json()
             else:
                 return {
-                    'mode': 'api',
-                    'error': f'Status check failed: {response.status_code}'
+                    'success': False,
+                    'error': f'API server error: {response.status_code}',
+                    'mode': 'api'
                 }
-        except:
+        except Exception as e:
             return {
-                'mode': 'api',
-                'error': 'Cannot connect to model API server'
+                'success': False,
+                'error': str(e),
+                'mode': 'api'
             }
 
 def get_api_model_manager() -> ModelManagerAPI:

@@ -377,5 +377,104 @@ LeRobot gives you the robotics automation backbone to turn AI triage decisions i
 
 
 
+## 🔍 Similarity Calculation System
+
+The RapidCare system uses a sophisticated dual-similarity approach for accurate missing person matching and reunification.
+
+### 📊 **Two-Tier Similarity Architecture**
+
+#### 1. **Vector Search Similarity** (Semantic/Text-based)
+**Purpose**: AI-Powered Description Search, general text queries
+**Technology**: ChromaDB with sentence-transformers embeddings
+**Process**:
+- Converts text queries and content into **384-dimensional embeddings**
+- Uses **cosine similarity** between query and stored content vectors
+- **Lower distance = Higher similarity** (0.0 = perfect match, higher = less similar)
+- Handles natural language, synonyms, and contextual understanding
+
+#### 2. **Characteristic Similarity** (Structured/Feature-based)
+**Purpose**: Enhanced missing person matching with precise feature comparison
+**Process**: Weighted scoring system for specific characteristics
+
+### ⚖️ **Characteristic Weighting System**
+
+```python
+physical_weights = {
+    'gender': 0.20,        # 20% weight - highest priority
+    'hair_color': 0.15,    # 15% weight
+    'eye_color': 0.12,     # 12% weight
+    'skin_tone': 0.10,     # 10% weight
+    'height': 0.08,        # 8% weight
+    'build': 0.08          # 8% weight
+}
+
+clothing_weights = {
+    'top': 0.08,           # 8% weight
+    'bottom': 0.08,        # 8% weight
+    'accessories': 0.05    # 5% weight
+}
+
+distinctive_features: 0.12  # 12% weight (Jaccard similarity)
+age_range: 0.10            # 10% weight (overlap calculation)
+```
+
+### 🔄 **Combined Similarity Process**
+
+For **AI-Powered Description Search**:
+
+1. **Vector Search**: Finds semantically similar missing persons using embeddings
+2. **Characteristic Matching**: Enhances results with structured feature comparison
+3. **Combined Score**: `(vector_similarity + characteristic_similarity) / 2`
+
+### 📈 **Example Calculation**
+
+**Query**: "my husband is white"
+
+**Vector Search**: 
+- Finds missing persons with similar semantic meaning
+- Score: 0.85 (85% semantic similarity)
+
+**Characteristic Matching**:
+- Gender match (male): +0.20 points
+- Skin tone match (light): +0.10 points
+- Total: 0.30 / 0.30 = **100% characteristic similarity**
+
+**Final Combined Score**: `(0.85 + 1.0) / 2 = 0.925` (92.5%)
+
+### 🎯 **Why This Dual Approach?**
+
+- **Vector Search**: Handles natural language, synonyms, context, and fuzzy matching
+- **Characteristic Matching**: Provides precise feature comparison for accuracy
+- **Combined**: Best of both worlds for reunification accuracy
+
+### 🏆 **Key Features**
+
+- **Gender Priority**: Gender gets the highest weight (20%) as the most important factor
+- **Age Range Overlap**: Calculates percentage overlap between age ranges
+- **Distinctive Features**: Uses Jaccard similarity for scars, tattoos, etc.
+- **Clothing Matching**: Partial string matching for clothing descriptions
+- **Real-time Updates**: Similarity scores update as new data is indexed
+
+### 🔧 **Technical Implementation**
+
+```python
+# Vector Search (ChromaDB)
+query_embedding = sentence_transformer.encode(query)
+results = collection.query(
+    query_embeddings=[query_embedding],
+    n_results=limit
+)
+
+# Characteristic Matching
+for feature, weight in physical_weights.items():
+    if desc_physical[feature] == person_physical[feature]:
+        total_score += weight
+
+# Combined Score
+final_score = (vector_similarity + characteristic_similarity) / 2
+```
+
+This sophisticated similarity system ensures that family members can find their loved ones quickly and accurately, even with incomplete or imprecise descriptions.
+
 Sources
 
