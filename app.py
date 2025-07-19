@@ -48,6 +48,13 @@ vector_search = get_vector_search_manager()
 def index():
     return render_template('index.html')
 
+@app.route('/offline.html')
+def offline_page():
+    from flask import send_from_directory
+    import os
+    templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
+    return send_from_directory(templates_dir, 'offline.html')
+
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     """Serve uploaded files with proper MIME types"""
@@ -561,14 +568,33 @@ def search_missing_persons_by_description():
         # Parse description to extract characteristics
         parsed_characteristics = parse_characteristics_from_text(description)
         
-        # Create enhanced search query
+        # Debug logging
+        print(f"🔍 Search query: '{description}'")
+        print(f"🔍 Parsed characteristics: {parsed_characteristics}")
+        
+        # Create enhanced search query with specific characteristics
+        physical = parsed_characteristics.get('physical_features', {})
+        clothing = parsed_characteristics.get('clothing', {})
+        distinctive = parsed_characteristics.get('distinctive_features', [])
+        age_range = parsed_characteristics.get('age_range', 'Unknown')
+        
+        # Build specific search terms
+        search_terms = []
+        if physical.get('gender'):
+            search_terms.append(f"gender: {physical['gender']}")
+        if physical.get('skin_tone'):
+            search_terms.append(f"skin tone: {physical['skin_tone']}")
+        if physical.get('hair_color'):
+            search_terms.append(f"hair color: {physical['hair_color']}")
+        if physical.get('eye_color'):
+            search_terms.append(f"eye color: {physical['eye_color']}")
+        if age_range != 'Unknown':
+            search_terms.append(f"age: {age_range}")
+        
         search_query = f"""
-        Looking for person with:
-        Physical: {parsed_characteristics.get('physical_features', {})}
-        Clothing: {parsed_characteristics.get('clothing', {})}
-        Distinctive: {parsed_characteristics.get('distinctive_features', [])}
-        Age: {parsed_characteristics.get('age_range', 'Unknown')}
-        Description: {description}
+        Missing person search criteria:
+        {', '.join(search_terms)}
+        Original description: {description}
         """
         
         # Use vector search to find similar missing persons
@@ -580,10 +606,24 @@ def search_missing_persons_by_description():
             for result in results:
                 person_characteristics = result.metadata.get('characteristics', {})
                 
+                # Parse characteristics from string if needed
+                if isinstance(person_characteristics, str):
+                    try:
+                        person_characteristics = json.loads(person_characteristics)
+                    except:
+                        person_characteristics = {}
+                
                 # Calculate characteristic similarity
                 similarity_score = calculate_characteristic_similarity(
                     parsed_characteristics, person_characteristics
                 )
+                
+                # Debug logging for top results
+                if i < 3:  # Log first 3 results
+                    print(f"🔍 Result {i+1}: {result.metadata.get('name', 'Unknown')}")
+                    print(f"  - Vector similarity: {result.similarity_score:.3f}")
+                    print(f"  - Characteristic similarity: {similarity_score:.3f}")
+                    print(f"  - Person characteristics: {person_characteristics}")
                 
                 # Combine vector similarity with characteristic similarity
                 combined_score = (result.similarity_score + similarity_score) / 2
@@ -634,10 +674,10 @@ def calculate_characteristic_similarity(desc_characteristics: Dict, person_chara
         person_physical = person_characteristics.get('physical_features', {})
         
         physical_weights = {
-            'gender': 0.20,
+            'gender': 0.30,  # Increased weight for gender
+            'skin_tone': 0.25,  # Increased weight for skin tone
             'hair_color': 0.15,
             'eye_color': 0.12,
-            'skin_tone': 0.10,
             'height': 0.08,
             'build': 0.08
         }
@@ -1508,6 +1548,13 @@ def parse_characteristics_from_text(text: str) -> Dict:
         for color in eye_colors:
             if color in text_lower:
                 characteristics['physical_features']['eye_color'] = color
+                break
+        
+        # Extract skin tone
+        skin_tones = ['white', 'black', 'brown', 'tan', 'olive', 'pale', 'dark', 'light']
+        for tone in skin_tones:
+            if tone in text_lower:
+                characteristics['physical_features']['skin_tone'] = tone
                 break
         
         # Extract clothing

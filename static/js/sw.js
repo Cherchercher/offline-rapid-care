@@ -1,11 +1,13 @@
 const CACHE_NAME = 'rapidcare-v1';
+const OFFLINE_URL = '/offline.html';
 const urlsToCache = [
     '/',
     '/static/css/style.css',
     '/static/js/app.js',
     '/static/manifest.json',
     '/static/images/icon-192x192.png',
-    '/static/images/icon-512x512.png'
+    '/static/images/icon-512x512.png',
+    OFFLINE_URL
 ];
 
 // Install event - cache resources
@@ -51,7 +53,7 @@ self.addEventListener('fetch', (event) => {
             .catch(() => {
                 // Return offline page for navigation requests
                 if (event.request.mode === 'navigate') {
-                    return caches.match('/');
+                    return caches.match(OFFLINE_URL);
                 }
             })
     );

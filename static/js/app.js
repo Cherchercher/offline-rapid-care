@@ -10,8 +10,6 @@ class RapidCareApp {
         this.isOnline = navigator.onLine;
         this.currentVoiceMethod = null;
         this.currentVoiceField = null;
-        
-        this.init();
     }
 
     init() {
@@ -2635,14 +2633,17 @@ class RapidCareApp {
 // Initialize app when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new RapidCareApp();
-    
-    // Check if user is already logged in
-    const savedRole = localStorage.getItem('rapidcare_role');
-    if (savedRole) {
-        window.app.currentRole = savedRole;
-        document.getElementById('welcome-text').textContent = `Welcome, ${window.app.getRoleDisplayName(savedRole)}`;
-        document.getElementById('login-screen').style.display = 'none';
-        document.getElementById('main-app').classList.remove('hidden');
-        window.app.addSystemMessage(`Welcome back, ${window.app.getRoleDisplayName(savedRole)}`);
-    }
+    window.app.init();
 }); 
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/static/js/sw.js')
+      .then(function(registration) {
+        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+      }, function(err) {
+        console.log('ServiceWorker registration failed: ', err);
+      });
+  });
+}

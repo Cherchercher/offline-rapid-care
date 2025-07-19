@@ -333,7 +333,7 @@ class VectorSearchManager:
                 'created_at': person_data.get('created_at', ''),
                 'image_path': person_data.get('image_path', ''),
                 'contact_info': person_data.get('contact_info', ''),
-                'characteristics': str(person_data.get('characteristics', {}))
+                'characteristics': json.dumps(person_data.get('characteristics', {}))
             }
             
             # Sanitize metadata to ensure all values are strings

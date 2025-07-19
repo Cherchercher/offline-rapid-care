@@ -478,3 +478,67 @@ This sophisticated similarity system ensures that family members can find their 
 
 Sources
 
+
+## Android Edge AI HTTP Server Setup
+
+To enable Edge AI auto-detection and HTTP bridge for your PWA backend, add the following to your Android project:
+
+### 1. Add NanoHTTPD and MediaPipe dependencies
+```gradle
+dependencies {
+    implementation 'org.nanohttpd:nanohttpd:2.3.1'
+    implementation 'com.google.mediapipe:tasks-text-textgen:latest.release' // Example for TextGeneration
+}
+```
+
+### 2. Implement EdgeAIHTTPServer with /health endpoint
+See `EdgeAIHTTPServer.java` in this repo for a reference implementation. The server should:
+- Respond to `GET /health` with 200 OK and body `OK` (for backend auto-detection)
+- Respond to `POST /edgeai` with model inference results
+
+### 3. Start the server in your MainActivity
+```java
+public class MainActivity extends AppCompatActivity {
+    EdgeAIHTTPServer server;
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        server = new EdgeAIHTTPServer(this);
+        try {
+            server.start();
+            Log.d("EdgeAI", "HTTP server started on port 12345");
+        } catch (IOException e) {
+            Log.e("EdgeAI", "Failed to start HTTP server", e);
+        }
+    }
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        if (server != null) {
+            server.stop();
+        }
+    }
+}
+```
+
+### 4. Add Internet Permission
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+```
+
+### 5. (Optional) Expose @JavascriptInterface for direct PWA-to-Android calls
+In your `MainActivity.kt` or `.java`:
+```kotlin
+@JavascriptInterface
+fun generateEdgeAiResponse(prompt: String): String {
+    val result = task.generate(prompt)
+    return result.text
+}
+// Register:
+webView.addJavascriptInterface(this, "EdgeAI")
+```
+
+---
+
+This setup allows your Python backend to auto-detect and use Edge AI on Android devices running your app.
+
