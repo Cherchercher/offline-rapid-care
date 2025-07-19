@@ -1876,19 +1876,4 @@ def vitals_api():
 
 
 if __name__ == '__main__':
-    # For development, you can use a self-signed certificate
-    # In production, use a proper SSL certificate
-    try:
-        print("Starting Flask app on HTTPS")
-        print("Access via: https://54.202.229.249:5050/")
-        print("Note: You may see a security warning - click 'Advanced' and 'Proceed'")
-        app.run(debug=True, host='0.0.0.0', port=5050, ssl_context='adhoc')
-    except ImportError as e:
-        print(f"SSL not available: {e}")
-        print("Note: MediaDevices API requires HTTPS in most browsers")
-        print("Access via: http://54.202.229.249:5050/")
-        app.run(debug=True, host='0.0.0.0', port=5050)
-    except Exception as e:
-        print(f"Error starting HTTPS: {e}")
-        print("Falling back to HTTP")
-        app.run(debug=True, host='0.0.0.0', port=5050) 
+    app.run(debug=True, host='127.0.0.1', port=5050) 
