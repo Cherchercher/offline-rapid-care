@@ -2364,66 +2364,121 @@ class RapidCareApp {
         try {
             updateProgress(0, 'Uploading image...');
             console.log('📸 Photo included in submission:', file.name);
-            const formData = new FormData();
             const name = form.querySelector('#missing-person-name').value.trim();
             const age = form.querySelector('#missing-person-age').value.trim();
             const description = form.querySelector('#missing-person-description').value.trim();
             const contactInfo = form.querySelector('#missing-person-contact').value.trim();
-            if (name) formData.append('name', name);
-            if (age) formData.append('age', age);
-            if (description) formData.append('description', description);
-            if (contactInfo) formData.append('contact_info', contactInfo);
-            formData.append('reported_by', this.currentRole || 'REUNIFICATION_COORDINATOR');
-            formData.append('photo', file);
-            console.log('📋 Form data entries:');
-            for (let [key, value] of formData.entries()) {
-                if (key === 'photo') {
-                    console.log(`  ${key}: [File] ${value.name} (${value.size} bytes)`);
-                } else {
-                    console.log(`  ${key}: ${value}`);
-                }
-            }
-            updateProgress(1, 'Extracting characteristics from image...');
-            await new Promise(resolve => setTimeout(resolve, 500));
-            updateProgress(2, 'Saving to database...');
-            // --- Add fetch timeout using AbortController ---
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+            const reportedBy = this.currentRole || 'REUNIFICATION_COORDINATOR';
+            const mode = getAIMode();
             let response;
-            try {
-                response = await fetch('/api/missing-persons', {
-                    method: 'POST',
-                    body: formData,
-                    signal: controller.signal
+            if (mode === 'edge') {
+                // Use /edgeai_image with base64 image and prompt
+                updateProgress(1, 'Encoding image for Edge AI...');
+                const toBase64 = file => new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]);
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
                 });
-            } finally {
-                clearTimeout(timeoutId);
-            }
-            // --- End fetch timeout ---
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-            }
-            const data = await response.json();
-            updateProgress(3, 'Indexing for search...');
-            await new Promise(resolve => setTimeout(resolve, 300));
-            if (data.success) {
-                progressText.textContent = 'Report submitted successfully!';
-                progressText.style.color = '#4caf50';
-                this.addSystemMessage('Missing person report submitted successfully. AI characteristics extracted for future matching.');
-                setTimeout(() => {
-                    this.closeModal(document.getElementById('missing-person-modal'));
-                    form.reset();
-                    const photoPreview = document.getElementById('photo-preview');
-                    const photoUploadArea = document.getElementById('photo-upload-area');
-                    if (photoPreview && photoUploadArea) {
-                        photoPreview.style.display = 'none';
-                        photoUploadArea.style.display = 'block';
-                    }
-                    progressIndicator.style.display = 'none';
-                    form.classList.remove('form-processing');
-                    submitBtn.disabled = false;
-                    progressText.style.color = '';
-                }, 1500);
+                const imageBase64 = await toBase64(file);
+                updateProgress(2, 'Sending to Edge AI...');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 300000);
+                try {
+                    response = await fetch('/edgeai_image', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            prompt: description || 'Extract missing person characteristics from this image.',
+                            image: imageBase64,
+                            model: null,
+                            name,
+                            age,
+                            contact_info: contactInfo,
+                            reported_by: reportedBy
+                        }),
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                updateProgress(3, 'Edge AI response received.');
+                console.log('Edge AI response:', data);
+                if (data.text) {
+                    this.addSystemMessage('Edge AI response: ' + data.text);
+                    progressText.textContent = 'Report submitted via Edge AI!';
+                    progressText.style.color = '#4caf50';
+                    setTimeout(() => {
+                        this.closeModal(document.getElementById('missing-person-modal'));
+                        form.reset();
+                        const photoPreview = document.getElementById('photo-preview');
+                        const photoUploadArea = document.getElementById('photo-upload-area');
+                        if (photoPreview && photoUploadArea) {
+                            photoPreview.style.display = 'none';
+                            photoUploadArea.style.display = 'block';
+                        }
+                        progressIndicator.style.display = 'none';
+                        form.classList.remove('form-processing');
+                        submitBtn.disabled = false;
+                        progressText.style.color = '';
+                    }, 1500);
+                } else {
+                    throw new Error(data.error || 'Unknown error from Edge AI');
+                }
+            } else {
+                // Use existing /api/missing-persons endpoint
+                const formData = new FormData();
+                if (name) formData.append('name', name);
+                if (age) formData.append('age', age);
+                if (description) formData.append('description', description);
+                if (contactInfo) formData.append('contact_info', contactInfo);
+                formData.append('reported_by', reportedBy);
+                formData.append('photo', file);
+                updateProgress(1, 'Extracting characteristics from image...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                updateProgress(2, 'Saving to database...');
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), 300000);
+                try {
+                    response = await fetch('/api/missing-persons', {
+                        method: 'POST',
+                        body: formData,
+                        signal: controller.signal
+                    });
+                } finally {
+                    clearTimeout(timeoutId);
+                }
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                const data = await response.json();
+                updateProgress(3, 'Indexing for search...');
+                await new Promise(resolve => setTimeout(resolve, 300));
+                if (data.success) {
+                    progressText.textContent = 'Report submitted successfully!';
+                    progressText.style.color = '#4caf50';
+                    this.addSystemMessage('Missing person report submitted successfully. AI characteristics extracted for future matching.');
+                    setTimeout(() => {
+                        this.closeModal(document.getElementById('missing-person-modal'));
+                        form.reset();
+                        const photoPreview = document.getElementById('photo-preview');
+                        const photoUploadArea = document.getElementById('photo-upload-area');
+                        if (photoPreview && photoUploadArea) {
+                            photoPreview.style.display = 'none';
+                            photoUploadArea.style.display = 'block';
+                        }
+                        progressIndicator.style.display = 'none';
+                        form.classList.remove('form-processing');
+                        submitBtn.disabled = false;
+                        progressText.style.color = '';
+                    }, 1500);
+                } else {
+                    throw new Error(data.error || 'Unknown error');
+                }
             }
         } catch (error) {
             console.error('Error submitting missing person report:', error);
@@ -2564,7 +2619,104 @@ class RapidCareApp {
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new RapidCareApp();
     window.app.init();
-}); 
+
+    // Add mode dropdown to the header or a suitable place
+    const header = document.getElementById('main-header') || document.body;
+    const modeDropdown = document.createElement('select');
+    modeDropdown.id = 'ai-mode-dropdown';
+    modeDropdown.style.margin = '0 1rem';
+    modeDropdown.innerHTML = `
+        <option value="cloud">Cloud AI</option>
+        <option value="edge">On-device AI (Edge AI)</option>
+    `;
+    // Restore previous selection
+    const savedMode = localStorage.getItem('ai_mode') || 'cloud';
+    modeDropdown.value = savedMode;
+    header.prepend(modeDropdown);
+
+    // Add flashy transition screen
+    const transitionScreen = document.createElement('div');
+    transitionScreen.id = 'edgeai-transition-screen';
+    transitionScreen.style.position = 'fixed';
+    transitionScreen.style.top = '0';
+    transitionScreen.style.left = '0';
+    transitionScreen.style.width = '100vw';
+    transitionScreen.style.height = '100vh';
+    transitionScreen.style.background = 'var(--primary-color)'; // Use logo color
+    transitionScreen.style.display = 'none';
+    transitionScreen.style.justifyContent = 'center';
+    transitionScreen.style.alignItems = 'center';
+    transitionScreen.style.zIndex = '9999';
+    transitionScreen.style.transition = 'opacity 0.5s';
+    transitionScreen.innerHTML = `
+        <div style="text-align:center; color:#fff; font-size:2.2rem; font-weight:bold;">
+            <div class="pulse-circle">
+                <div class="medical-cross">+</div>
+            </div>
+            <div style="margin-top:2rem; font-size:2rem; font-weight:700; letter-spacing:1px;">Switching to On-Device AI</div>
+            <div style="font-size:1.2rem; margin-top:0.5rem;">Emergency Medicine Mode</div>
+        </div>
+        <style>
+        .pulse-circle {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.12);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            animation: edgeai-pulse 1.2s infinite;
+            box-shadow: 0 0 0 0 rgba(255,255,255,0.5);
+        }
+        .medical-cross {
+            color: #fff;
+            font-size: 4rem;
+            font-weight: 900;
+            line-height: 1;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            text-shadow: 0 2px 8px rgba(0,0,0,0.10);
+        }
+        @keyframes edgeai-pulse {
+            0% {
+                box-shadow: 0 0 0 0 rgba(255,255,255,0.5);
+            }
+            70% {
+                box-shadow: 0 0 0 30px rgba(255,255,255,0);
+            }
+            100% {
+                box-shadow: 0 0 0 0 rgba(255,255,255,0);
+            }
+        }
+        </style>
+    `;
+    document.body.appendChild(transitionScreen);
+
+    modeDropdown.addEventListener('change', () => {
+        const selected = modeDropdown.value;
+        localStorage.setItem('ai_mode', selected);
+        if (selected === 'edge') {
+            // Show flashy transition
+            transitionScreen.style.display = 'flex';
+            transitionScreen.style.opacity = '1';
+            setTimeout(() => {
+                transitionScreen.style.opacity = '0';
+                setTimeout(() => {
+                    transitionScreen.style.display = 'none';
+                }, 500);
+            }, 2000);
+        }
+    });
+});
+
+// Helper to get current AI mode
+function getAIMode() {
+    return localStorage.getItem('ai_mode') || 'cloud';
+}
 
 // Register service worker for PWA
 if ('serviceWorker' in navigator) {
@@ -2576,4 +2728,52 @@ if ('serviceWorker' in navigator) {
         console.log('ServiceWorker registration failed: ', err);
       });
   });
+}
+
+// Assume modelManager is initialized somewhere in the frontend (or backend via API call)
+// Add logic to (re)initialize or update modelManager with the selected mode
+
+// Example: If you have a global modelManager or API call that needs the mode
+function initializeModelManagerWithMode() {
+    const mode = getAIMode();
+    // This is a placeholder for your actual initialization logic
+    // For example, if you call an API to set the mode, do it here
+    // Or if you have a JS-side modelManager, re-instantiate it here
+    if (window.modelManager) {
+        if (typeof window.modelManager.setMode === 'function') {
+            window.modelManager.setMode(mode);
+        } else {
+            // Re-instantiate if needed
+            window.modelManager = new ModelManager({ mode });
+        }
+    } else if (typeof ModelManager !== 'undefined') {
+        window.modelManager = new ModelManager({ mode });
+    }
+    // Optionally, notify the backend of the mode change if needed
+    // fetch('/api/model/switch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) });
+}
+
+// Call on page load
+initializeModelManagerWithMode();
+
+// Helper to get backend mode value
+function getBackendMode() {
+    const mode = getAIMode();
+    if (mode === 'edge') return 'edge_ai';
+    if (mode === 'cloud') return 'ollama'; // or 'direct' if you want local
+    return mode;
+}
+
+// Update on dropdown change
+const modeDropdown = document.getElementById('ai-mode-dropdown');
+if (modeDropdown) {
+    modeDropdown.addEventListener('change', () => {
+        initializeModelManagerWithMode();
+        // Notify backend of mode change
+        fetch('/api/model/switch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mode: getBackendMode() })
+        });
+    });
 }

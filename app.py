@@ -1429,8 +1429,8 @@ def switch_model_mode():
         data = request.json
         new_mode = data.get('mode', 'auto')
         
-        if new_mode not in ['direct', 'ollama', 'auto']:
-            return jsonify({'error': 'Invalid mode. Use: direct, ollama, or auto'}), 400
+        if new_mode not in ['direct', 'ollama', 'auto', 'edge_ai']:
+            return jsonify({'error': 'Invalid mode. Use: direct, ollama, edge_ai, or auto'}), 400
         
         # Switch mode
         model_manager.switch_mode(new_mode)
