@@ -551,6 +551,22 @@ def search_missing_persons():
             'error': str(e)
         }), 500
 
+def is_all_unknown(characteristics):
+    if not characteristics:
+        return True
+    for v in characteristics.get('physical_features', {}).values():
+        if v and v.lower() != 'unknown':
+            return False
+    for v in characteristics.get('clothing', {}).values():
+        if v and v.lower() != 'unknown':
+            return False
+    if characteristics.get('distinctive_features'):
+        if any(x.lower() != 'unknown' for x in characteristics['distinctive_features']):
+            return False
+    if characteristics.get('age_range', '').lower() != 'unknown':
+        return False
+    return True
+
 @app.route('/api/search/missing-persons-by-description', methods=['POST'])
 def search_missing_persons_by_description():
     """Search for missing persons using family member descriptions"""
@@ -601,7 +617,7 @@ def search_missing_persons_by_description():
         if db_manager.vector_search and db_manager.vector_search.is_available():
             results = vector_search.search_missing_persons(search_query, limit)
             
-            # Enhance results with hybrid weighted scoring
+            # Enhance results with hybrid weighted scoring and filter out all-unknowns
             enhanced_results = []
             for result in results:
                 person_characteristics = result.metadata.get('characteristics', {})
@@ -613,17 +629,19 @@ def search_missing_persons_by_description():
                         person_characteristics = {}
                 # Calculate characteristic similarity
                 char_sim = calculate_characteristic_similarity(parsed_characteristics, person_characteristics)
-                # Weighted hybrid score: 70% vector, 30% characteristic
-                combined_score = 0.7 * result.similarity_score + 0.3 * char_sim
-                enhanced_results.append({
-                    'id': result.id,
-                    'content': result.content,
-                    'metadata': result.metadata,
-                    'similarity_score': combined_score,
-                    'source_type': result.source_type,
-                    'characteristic_match': char_sim,
-                    'vector_score': result.similarity_score
-                })
+                # Weighted hybrid score: 30% vector, 70% characteristic
+                combined_score = 0.3 * result.similarity_score + 0.7 * char_sim
+                # Filter out results where all features are unknown
+                if not is_all_unknown(person_characteristics):
+                    enhanced_results.append({
+                        'id': result.id,
+                        'content': result.content,
+                        'metadata': result.metadata,
+                        'similarity_score': combined_score,
+                        'source_type': result.source_type,
+                        'characteristic_match': char_sim,
+                        'vector_score': result.similarity_score
+                    })
             # Sort by combined score
             enhanced_results.sort(key=lambda x: x['similarity_score'], reverse=True)
             return jsonify({

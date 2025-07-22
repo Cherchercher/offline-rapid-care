@@ -2335,34 +2335,22 @@ class RapidCareApp {
 
     async handleMissingPersonSubmit(event) {
         event.preventDefault();
-        
         console.log('🔍 Missing person form submitted');
-        
         const form = event.target;
         const photoInput = document.getElementById('missing-person-photo-input');
         const file = photoInput.files[0];
-        
-        // Validate that a photo is provided (this is the main requirement)
         if (!file) {
             this.addSystemMessage('Please upload a photo of the missing person. The photo is required for AI-powered matching.');
             return;
         }
-        
-        // Show progress indicator and disable form
         const progressIndicator = document.getElementById('missing-person-progress');
         const progressText = document.getElementById('progress-text');
         const submitBtn = form.querySelector('button[type="submit"]');
-        
         progressIndicator.style.display = 'block';
         form.classList.add('form-processing');
         submitBtn.disabled = true;
-        
-        // Helper function to update progress
         const updateProgress = (step, text) => {
-            // Update progress text
             progressText.textContent = text;
-            
-            // Update step indicators
             const steps = progressIndicator.querySelectorAll('.progress-step');
             steps.forEach((stepEl, index) => {
                 stepEl.classList.remove('active', 'completed');
@@ -2373,29 +2361,20 @@ class RapidCareApp {
                 }
             });
         };
-        
         try {
-            // Step 1: Uploading image
             updateProgress(0, 'Uploading image...');
             console.log('📸 Photo included in submission:', file.name);
-            
-            // Create FormData for multipart upload
             const formData = new FormData();
-            
-            // Add optional fields only if they have values
             const name = form.querySelector('#missing-person-name').value.trim();
             const age = form.querySelector('#missing-person-age').value.trim();
             const description = form.querySelector('#missing-person-description').value.trim();
             const contactInfo = form.querySelector('#missing-person-contact').value.trim();
-            
             if (name) formData.append('name', name);
             if (age) formData.append('age', age);
             if (description) formData.append('description', description);
             if (contactInfo) formData.append('contact_info', contactInfo);
-            
             formData.append('reported_by', this.currentRole || 'REUNIFICATION_COORDINATOR');
             formData.append('photo', file);
-            
             console.log('📋 Form data entries:');
             for (let [key, value] of formData.entries()) {
                 if (key === 'photo') {
@@ -2404,76 +2383,51 @@ class RapidCareApp {
                     console.log(`  ${key}: ${value}`);
                 }
             }
-            
-            // Step 2: Extracting characteristics from image
             updateProgress(1, 'Extracting characteristics from image...');
-            // Small delay to show the step
             await new Promise(resolve => setTimeout(resolve, 500));
-            
-            // Step 3: Saving to database
             updateProgress(2, 'Saving to database...');
-            
-            const response = await fetch('/api/missing-persons', {
-                method: 'POST',
-                body: formData // Send as FormData, not JSON
-            });
-            
+            // --- Add fetch timeout using AbortController ---
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5 minutes
+            let response;
+            try {
+                response = await fetch('/api/missing-persons', {
+                    method: 'POST',
+                    body: formData,
+                    signal: controller.signal
+                });
+            } finally {
+                clearTimeout(timeoutId);
+            }
+            // --- End fetch timeout ---
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
-            
             const data = await response.json();
-            
-            // Step 4: Indexing for search
             updateProgress(3, 'Indexing for search...');
-            // Small delay to show the indexing step
             await new Promise(resolve => setTimeout(resolve, 300));
-            
             if (data.success) {
-                // Show completion
                 progressText.textContent = 'Report submitted successfully!';
                 progressText.style.color = '#4caf50';
-                
                 this.addSystemMessage('Missing person report submitted successfully. AI characteristics extracted for future matching.');
-                
-                // Reset form after a short delay
                 setTimeout(() => {
                     this.closeModal(document.getElementById('missing-person-modal'));
                     form.reset();
-                    
-                    // Reset photo preview
                     const photoPreview = document.getElementById('photo-preview');
                     const photoUploadArea = document.getElementById('photo-upload-area');
                     if (photoPreview && photoUploadArea) {
                         photoPreview.style.display = 'none';
                         photoUploadArea.style.display = 'block';
                     }
-                    
-                    // Hide progress indicator
                     progressIndicator.style.display = 'none';
                     form.classList.remove('form-processing');
                     submitBtn.disabled = false;
                     progressText.style.color = '';
                 }, 1500);
-            } else {
-                throw new Error(data.error || 'Unknown error');
             }
         } catch (error) {
             console.error('Error submitting missing person report:', error);
-            
-            // Show error in progress
-            progressText.textContent = `Error: ${error.message}`;
-            progressText.style.color = '#f44336';
-            
             this.addSystemMessage(`Error: ${error.message}`);
-            
-            // Reset form after error
-            setTimeout(() => {
-                progressIndicator.style.display = 'none';
-                form.classList.remove('form-processing');
-                submitBtn.disabled = false;
-                progressText.style.color = '';
-            }, 3000);
         }
     }
 
