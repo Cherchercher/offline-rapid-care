@@ -2385,7 +2385,7 @@ class RapidCareApp {
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 300000);
                 try {
-                    response = await fetch('/edgeai_image', {
+                    response = await fetch('http://10.188.1.21:12345/edgeai_image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
