@@ -601,45 +601,31 @@ def search_missing_persons_by_description():
         if db_manager.vector_search and db_manager.vector_search.is_available():
             results = vector_search.search_missing_persons(search_query, limit)
             
-            # Enhance results with characteristic matching
+            # Enhance results with hybrid weighted scoring
             enhanced_results = []
             for result in results:
                 person_characteristics = result.metadata.get('characteristics', {})
-                
                 # Parse characteristics from string if needed
                 if isinstance(person_characteristics, str):
                     try:
                         person_characteristics = json.loads(person_characteristics)
                     except:
                         person_characteristics = {}
-                
                 # Calculate characteristic similarity
-                similarity_score = calculate_characteristic_similarity(
-                    parsed_characteristics, person_characteristics
-                )
-                
-                # Debug logging for top results
-                if i < 3:  # Log first 3 results
-                    print(f"🔍 Result {i+1}: {result.metadata.get('name', 'Unknown')}")
-                    print(f"  - Vector similarity: {result.similarity_score:.3f}")
-                    print(f"  - Characteristic similarity: {similarity_score:.3f}")
-                    print(f"  - Person characteristics: {person_characteristics}")
-                
-                # Combine vector similarity with characteristic similarity
-                combined_score = (result.similarity_score + similarity_score) / 2
-                
+                char_sim = calculate_characteristic_similarity(parsed_characteristics, person_characteristics)
+                # Weighted hybrid score: 70% vector, 30% characteristic
+                combined_score = 0.7 * result.similarity_score + 0.3 * char_sim
                 enhanced_results.append({
                     'id': result.id,
                     'content': result.content,
                     'metadata': result.metadata,
                     'similarity_score': combined_score,
                     'source_type': result.source_type,
-                    'characteristic_match': similarity_score
+                    'characteristic_match': char_sim,
+                    'vector_score': result.similarity_score
                 })
-            
-            # Sort by combined similarity score
+            # Sort by combined score
             enhanced_results.sort(key=lambda x: x['similarity_score'], reverse=True)
-            
             return jsonify({
                 'success': True,
                 'results': enhanced_results,
@@ -1685,95 +1671,6 @@ def missing_persons_api():
             'error': str(e)
         }), 500
 
-@app.route('/api/missing-persons/match', methods=['POST'])
-def missing_persons_match():
-    """Find potential matches for a missing person using photo"""
-    try:
-        if 'photo' not in request.files:
-            return jsonify({'error': 'No photo file provided'}), 400
-        
-        file = request.files['photo']
-        if file.filename == '':
-            return jsonify({'error': 'No photo file selected'}), 400
-        
-        # Save uploaded image
-        filename = f"search_image_{uuid.uuid4()}.jpg"
-        image_path = os.path.join('uploads', filename)
-        file.save(image_path)
-        
-        # Find matches using database manager
-        matches = db_manager.find_missing_person_match(image_path)
-        
-        # Enhance matches with proper image URLs
-        enhanced_matches = []
-        for match in matches:
-            enhanced_match = match.copy()
-            
-            # Add proper image URL if image exists
-            if match.get('image_path') and os.path.exists(match['image_path']):
-                image_filename = os.path.basename(match['image_path'])
-                enhanced_match['image_url'] = f"/uploads/{image_filename}"
-            else:
-                enhanced_match['image_url'] = None
-            
-            # Ensure all required fields are present
-            enhanced_match['name'] = match.get('name', 'Unknown')
-            enhanced_match['age'] = match.get('age', 'Unknown')
-            enhanced_match['description'] = match.get('description', 'No description available')
-            enhanced_match['status'] = match.get('status', 'missing')
-            enhanced_match['similarity_score'] = match.get('similarity_score', 0.0)
-            
-            enhanced_matches.append(enhanced_match)
-        
-        return jsonify({
-            'success': True,
-            'matches': enhanced_matches,
-            'search_image_path': image_path,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
-@app.route('/api/find-match', methods=['POST'])
-def find_match():
-    """Find potential matches for a missing person"""
-    try:
-        if 'file' not in request.files:
-            return jsonify({'error': 'No image file provided'}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({'error': 'No image file selected'}), 400
-        
-        # Save uploaded image
-        filename = f"search_image_{uuid.uuid4()}.jpg"
-        image_path = os.path.join('uploads', filename)
-        file.save(image_path)
-        
-        # Find matches
-        matches = db_manager.find_missing_person_match(image_path)
-        
-        return jsonify({
-            'success': True,
-            'matches': matches,
-            'search_image_path': image_path,
-            'timestamp': datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        import traceback
-        traceback.print_exc()
-        return jsonify({
-            'success': False,
-            'error': str(e)
-        }), 500
-
 @app.route('/api/transcribe-audio', methods=['POST'])
 def transcribe_audio():
     """Transcribe audio using Gemma 3n"""
@@ -1873,6 +1770,70 @@ def vitals_api():
         traceback.print_exc()
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/edgeai', methods=['POST'])
+def edgeai_text():
+    """Compatible with Android EdgeAIHTTPServer: Accepts JSON {"prompt": ..., "model": ...} and returns {"text": ...}"""
+    try:
+        data = request.get_json(force=True)
+        prompt = data.get('prompt', '')
+        model_name = data.get('model', None)
+        if not prompt:
+            return jsonify({'error': 'No prompt provided'}), 400
+        # Use model_manager to generate text (customize as needed)
+        if hasattr(model_manager, 'chat_text'):
+            # If chat_text expects messages, wrap prompt
+            result = model_manager.chat_text([{"role": "user", "content": prompt}], model_name) if model_name else model_manager.chat_text([{"role": "user", "content": prompt}])
+            text = result.get('response', '') if isinstance(result, dict) else result
+        elif hasattr(model_manager, '_chat_edge_ai'):
+            text = model_manager._chat_edge_ai(prompt)
+        else:
+            text = 'No compatible model_manager method found.'
+        return jsonify({"text": text})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/edgeai_image', methods=['POST'])
+def edgeai_image():
+    """Compatible with Android EdgeAIHTTPServer: Accepts JSON {"prompt": ..., "image": base64, "model": ...} and returns {"text": ...}"""
+    try:
+        import base64, io
+        from PIL import Image
+        data = request.get_json(force=True)
+        prompt = data.get('prompt', '')
+        image_base64 = data.get('image', None)
+        model_name = data.get('model', None)
+        if not prompt or not image_base64:
+            return jsonify({'error': 'Prompt and image (base64) required'}), 400
+        # Decode base64 image
+        image_bytes = base64.b64decode(image_base64)
+        image = Image.open(io.BytesIO(image_bytes))
+        # If your model_manager expects a file path, save temp file
+        # If it expects a PIL image or bytes, pass directly
+        if hasattr(model_manager, 'chat_image'):
+            # Example: chat_image expects messages
+            import numpy as np
+            frame = np.array(image)
+            # Convert image to base64 for message
+            buffer = io.BytesIO()
+            image.save(buffer, format='JPEG')
+            frame_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
+            messages = [
+                {"role": "user", "content": [
+                    {"type": "image", "path": f"data:image/jpeg;base64,{frame_base64}"},
+                    {"type": "text", "text": prompt}
+                ]}
+            ]
+            result = model_manager.chat_image(messages, model_name) if model_name else model_manager.chat_image(messages)
+            text = result.get('response', '') if isinstance(result, dict) else result
+        elif hasattr(model_manager, '_chat_edge_ai'):
+            text = model_manager._chat_edge_ai(prompt)
+        else:
+            text = 'No compatible model_manager method found.'
+        return jsonify({"text": text})
+    except Exception as e:
+        import traceback; traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == '__main__':

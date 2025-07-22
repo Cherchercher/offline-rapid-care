@@ -645,68 +645,6 @@
             </div>
         </div>
 
-        <!-- Find Match Modal -->
-        <div id="find-match-modal" class="modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h3>Find Missing Person Match</h3>
-                    <button class="close-btn">&times;</button>
-                </div>
-                <div class="modal-body">
-                    <form id="find-match-form">
-                        <div class="form-group">
-                            <label for="search-photo">Upload Photo to Search:</label>
-                            <div class="photo-upload-area" id="search-photo-upload-area">
-                                <i class="fas fa-search"></i>
-                                <p>Click to upload photo for matching</p>
-                                <input type="file" id="search-photo-input" accept="image/*" style="display: none;">
-                            </div>
-                            <div id="search-photo-preview" class="photo-preview" style="display: none;">
-                                <img id="search-photo-preview-img" src="" alt="Search photo preview">
-                                <button type="button" id="remove-search-photo-btn" class="btn-secondary">
-                                    <i class="fas fa-times"></i> Remove
-                                </button>
-                            </div>
-                        </div>
-                        <button type="submit" id="search-match-btn" class="btn-primary" disabled>
-                            <i class="fas fa-search"></i> Search for Matches
-                        </button>
-                        
-                        <!-- Progress Indicator -->
-                        <div id="find-match-progress" class="progress-indicator" style="display: none;">
-                            <div class="progress-header">
-                                <i class="fas fa-spinner fa-spin"></i>
-                                <span id="find-match-progress-text">Processing...</span>
-                            </div>
-                            <div class="progress-steps">
-                                <div class="progress-step" data-step="upload">
-                                    <i class="fas fa-upload"></i>
-                                    <span>Uploading search image...</span>
-                                </div>
-                                <div class="progress-step" data-step="analyze">
-                                    <i class="fas fa-brain"></i>
-                                    <span>Analyzing image characteristics...</span>
-                                </div>
-                                <div class="progress-step" data-step="search">
-                                    <i class="fas fa-search"></i>
-                                    <span>Searching database...</span>
-                                </div>
-                                <div class="progress-step" data-step="match">
-                                    <i class="fas fa-users"></i>
-                                    <span>Finding potential matches...</span>
-                                </div>
-                            </div>
-                        </div>
-                    </form>
-                    
-                    <div id="match-results" class="match-results" style="display: none;">
-                        <h4>Potential Matches</h4>
-                        <div id="match-list"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- Missing Persons List Modal -->
         <div id="missing-persons-list-modal" class="modal">
             <div class="modal-content">

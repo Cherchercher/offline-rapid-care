@@ -502,35 +502,23 @@ class RapidCareApp {
                     <div class="action-icon">
                         <i class="fas fa-user-plus"></i>
                     </div>
-                    <h3>Submit Missing Person</h3>
+                    <h3>Report Missing Person</h3>
                     <p>Report a missing person with photo and details</p>
                     <button class="action-btn">
                         <i class="fas fa-upload"></i>
-                        Submit Report
-                    </button>
-                </div>
-
-                <div class="action-card" data-action="find-match">
-                    <div class="action-icon">
-                        <i class="fas fa-search"></i>
-                    </div>
-                    <h3>Find Match</h3>
-                    <p>Search for matching missing persons using photo</p>
-                    <button class="action-btn">
-                        <i class="fas fa-camera"></i>
-                        Search Database
+                        Report
                     </button>
                 </div>
 
                 <div class="action-card" data-action="view-missing-persons">
                     <div class="action-icon">
-                        <i class="fas fa-list"></i>
+                        <i class="fas fa-users"></i>
                     </div>
-                    <h3>View Missing Persons</h3>
-                    <p>View all reported missing persons</p>
+                    <h3>Search Missing Person</h3>
+                    <p>Search all reported missing persons</p>
                     <button class="action-btn">
-                        <i class="fas fa-eye"></i>
-                        View All
+                        <i class="fas fa-search"></i>
+                        Search
                     </button>
                 </div>
 
@@ -692,9 +680,6 @@ class RapidCareApp {
             case 'submit-missing-person':
                 this.openMissingPersonModal();
                 break;
-            case 'find-match':
-                this.openFindMatchModal();
-                break;
             case 'view-missing-persons':
                 this.showMissingPersonsList();
                 break;
@@ -735,15 +720,6 @@ class RapidCareApp {
         
         // Clear form
         document.getElementById('missing-person-form').reset();
-        
-        this.showModal(modal);
-    }
-
-    openFindMatchModal() {
-        const modal = document.getElementById('find-match-modal');
-        
-        // Clear form
-        document.getElementById('find-match-form').reset();
         
         this.showModal(modal);
     }

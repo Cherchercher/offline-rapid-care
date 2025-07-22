@@ -221,13 +221,32 @@ class ModelManagerPipeline:
             input_ids = input_ids.to("cpu", dtype=model_dtype)
             print(f"🔊 Using model dtype: {model_dtype}")
             
+            # --- ADDED: Input tensor validation ---
+            for k, v in input_ids.items():
+                if hasattr(v, 'shape'):
+                    print(f"🔍 Tensor {k}: shape={v.shape}, dtype={v.dtype}, min={v.min().item()}, max={v.max().item()}, any NaN={torch.isnan(v).any().item()}, any Inf={torch.isinf(v).any().item()}")
+                    if torch.isnan(v).any() or torch.isinf(v).any():
+                        raise ValueError(f"Input tensor {k} contains NaN or Inf values!")
+            # --- END ADDED ---
+            
             # Generate response
-            outputs = self.direct_model.generate(
-                **input_ids, 
-                max_new_tokens=256,
-                do_sample=True,
-                temperature=0.7
-            )
+            try:
+                outputs = self.direct_model.generate(
+                    **input_ids, 
+                    max_new_tokens=256,
+                    do_sample=True,
+                    temperature=0.7
+                )
+            except RuntimeError as gen_err:
+                print(f"❌ Model generate() failed: {gen_err}")
+                # If probability tensor error, suggest updating model or preprocessing
+                if 'probability tensor' in str(gen_err):
+                    print("⚠️  Probability tensor error: consider updating model weights, preprocessing, or temperature parameter.")
+                return {
+                    'success': False,
+                    'error': str(gen_err),
+                    'mode': 'image-direct'
+                }
             
             # Decode response
             decoded_outputs = self.direct_processor.batch_decode(
@@ -274,6 +293,7 @@ class ModelManagerPipeline:
                 'error': str(e),
                 'mode': 'image-direct'
             }
+        # Note: If probability tensor errors persist, consider updating model weights or preprocessing pipeline.
     
     def chat_video(self, messages: List[Dict]) -> Dict:
         """
