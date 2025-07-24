@@ -2372,7 +2372,7 @@ class RapidCareApp {
             const mode = getAIMode();
             let response;
             if (mode === 'edge') {
-                // Use /edgeai_image with base64 image and prompt
+                // Convert image to base64 and send to Edge AI server
                 updateProgress(1, 'Encoding image for Edge AI...');
                 const toBase64 = file => new Promise((resolve, reject) => {
                     const reader = new FileReader();
@@ -2390,8 +2390,8 @@ class RapidCareApp {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            prompt: description || 'Extract missing person characteristics from this image.',
-                            imageUrl: imageBase64,
+                            prompt: PROMPTS.CHARACTERISTIC_EXTRACTION,
+                            image: imageBase64,
                             model: 'gemma3n_e4b_it'
                         }),
                         signal: controller.signal
@@ -2422,6 +2422,8 @@ class RapidCareApp {
                 } else {
                     throw new Error(data.error || 'Unknown error from Edge AI');
                 }
+                // Display extracted characteristics to the user
+                this.displayExtractedCharacteristics(aiCharacteristics);
                 // Now submit to local API to store the record
                 updateProgress(4, 'Saving to local database...');
                 const edgeResponse = await fetch('/api/missing-persons/edge', {
@@ -2647,6 +2649,38 @@ class RapidCareApp {
         
         matchResults.style.display = 'block';
     }
+
+    // Add this method to the RapidCareApp class
+    displayExtractedCharacteristics(characteristics) {
+        if (!characteristics || Object.keys(characteristics).length === 0) {
+            this.addSystemMessage('No characteristics extracted from the image.');
+            return;
+        }
+        let html = '<div class="extracted-characteristics"><h4>Extracted Characteristics:</h4><ul>';
+        if (characteristics.physical_features) {
+            html += '<li><strong>Physical Features:</strong><ul>';
+            for (const [k, v] of Object.entries(characteristics.physical_features)) {
+                html += `<li>${k.replace(/_/g, ' ')}: <b>${v}</b></li>`;
+            }
+            html += '</ul></li>';
+        }
+        if (characteristics.clothing) {
+            html += '<li><strong>Clothing:</strong><ul>';
+            for (const [k, v] of Object.entries(characteristics.clothing)) {
+                html += `<li>${k.replace(/_/g, ' ')}: <b>${v}</b></li>`;
+            }
+            html += '</ul></li>';
+        }
+        if (characteristics.distinctive_features && characteristics.distinctive_features.length) {
+            html += `<li><strong>Distinctive Features:</strong> <b>${characteristics.distinctive_features.join(', ')}</b></li>`;
+        }
+        if (characteristics.age_range) {
+            html += `<li><strong>Age Range:</strong> <b>${characteristics.age_range}</b></li>`;
+        }
+        html += '</ul></div>';
+        // Show in system message (or you could use a modal)
+        this.addSystemMessage(html);
+    }
 }
 
 // Initialize app when DOM is loaded
@@ -2687,7 +2721,12 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="pulse-circle">
                 <div class="medical-cross">+</div>
             </div>
-            <div style="margin-top:2rem; font-size:2rem; font-weight:700; letter-spacing:1px;">Switching to On-Device AI</div>
+            <div style="margin-top:2rem; font-size:2rem; font-weight:700; letter-spacing:1px; display: flex; flex-direction: column; align-items: center;">
+                <span style="display: flex; align-items: center; gap: 0.5rem;">
+                    <svg width="36" height="36" viewBox="0 0 48 48" style="vertical-align: middle;"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.978 32.708 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.73 0 5.23.936 7.207 2.482l6.121-6.121C33.527 5.537 28.977 4 24 4c-6.627 0-12 5.373-12 12 0 1.341.138 2.651.306 3.691z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.104 19.001 13 24 13c2.73 0 5.23.936 7.207 2.482l6.121-6.121C33.527 5.537 28.977 4 24 4c-6.627 0-12 5.373-12 12 0 1.341.138 2.651.306 3.691z"/><path fill="#FBBC05" d="M24 44c5.418 0 9.978-3.292 11.303-8.083l-8.303-6.417C25.23 33.064 22.73 34 20 34c-4.999 0-9.345-3.104-11.123-7.51l-6.571 4.819C8.954 40.463 19.003 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C33.978 32.708 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.73 0 5.23.936 7.207 2.482l6.121-6.121C33.527 5.537 28.977 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c10.998 0 19.837-7.998 19.837-20 0-1.341-.138-2.651-.226-3.917z" opacity=".15"/></g></svg>
+                    <span>Powered by Google AI Edge</span>
+                </span>
+            </div>
             <div style="font-size:1.2rem; margin-top:0.5rem;">Emergency Medicine Mode</div>
         </div>
         <style>

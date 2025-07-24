@@ -10,6 +10,7 @@ from database_setup import get_db_manager
 from vector_search import get_vector_search_manager
 import re
 from prompts import CHARACTERISTIC_EXTRACTION_PROMPT, VITALS_EXTRACTION_PROMPT, MEDICAL_TRIAGE_PROMPT, REUNIFICATION_SEARCH_PROMPT, DESCRIPTION_PARSING_PROMPT, AUDIO_TRANSCRIPTION_PROMPT, MEDICAL_TRANSCRIPTION_PROMPT, SOAP_SUBJECTIVE_PROMPT, SOAP_OBJECTIVE_PROMPT, SOAP_ASSESSMENT_PROMPT, SOAP_PLAN_PROMPT, GENERAL_MEDICAL_ANALYSIS_PROMPT, FALLBACK_CHARACTERISTIC_PROMPT, AI_QUERY_SYSTEM_PROMPT_TEMPLATE, TRANSCRIBE_TEXT_SYSTEM_PROMPT_TEMPLATE, AUDIO_ENHANCEMENT_PROMPT_TEMPLATE
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
@@ -97,6 +98,20 @@ def uploaded_file(filename):
     
     # For other files, use send_from_directory
     return send_from_directory(UPLOADS_DIR, filename, mimetype=mime_type)
+
+@app.route('/uploads', methods=['POST'])
+def upload_file():
+    """Upload a file to the uploads directory and return its URL"""
+    if 'file' not in request.files:
+        return jsonify({'success': False, 'error': 'No file part'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'success': False, 'error': 'No selected file'}), 400
+    filename = secure_filename(file.filename)
+    save_path = os.path.join(UPLOADS_DIR, filename)
+    file.save(save_path)
+    url = f'/uploads/{filename}'
+    return jsonify({'success': True, 'url': url})
 
 @app.route('/chat/text', methods=['POST'])
 def chat_text():
