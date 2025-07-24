@@ -2384,18 +2384,15 @@ class RapidCareApp {
                 updateProgress(2, 'Sending to Edge AI...');
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 300000);
+                let aiCharacteristics = {};
                 try {
-                    response = await fetch('http://10.188.1.21:12345/edgeai_image', {
+                    response = await fetch('http://192.168.0.15:12345/edgeai_image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                             prompt: description || 'Extract missing person characteristics from this image.',
-                            image: imageBase64,
-                            model: null,
-                            name,
-                            age,
-                            contact_info: contactInfo,
-                            reported_by: reportedBy
+                            imageUrl: imageBase64,
+                            model: 'gemma3n_e4b_it'
                         }),
                         signal: controller.signal
                     });
@@ -2408,10 +2405,46 @@ class RapidCareApp {
                 const data = await response.json();
                 updateProgress(3, 'Edge AI response received.');
                 console.log('Edge AI response:', data);
+                // Try to parse characteristics from the response text
                 if (data.text) {
-                    this.addSystemMessage('Edge AI response: ' + data.text);
-                    progressText.textContent = 'Report submitted via Edge AI!';
+                    try {
+                        // Try to extract JSON from markdown code block
+                        const match = data.text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+                        if (match) {
+                            aiCharacteristics = JSON.parse(match[1]);
+                        } else {
+                            aiCharacteristics = JSON.parse(data.text);
+                        }
+                    } catch (e) {
+                        // fallback: leave as empty object
+                        aiCharacteristics = {};
+                    }
+                } else {
+                    throw new Error(data.error || 'Unknown error from Edge AI');
+                }
+                // Now submit to local API to store the record
+                updateProgress(4, 'Saving to local database...');
+                const edgeResponse = await fetch('/api/missing-persons/edge', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name,
+                        age,
+                        description,
+                        contact_info: contactInfo,
+                        reported_by: reportedBy,
+                        image_base64: imageBase64,
+                        ai_characteristics: aiCharacteristics
+                    })
+                });
+                if (!edgeResponse.ok) {
+                    throw new Error(`HTTP ${edgeResponse.status}: ${edgeResponse.statusText}`);
+                }
+                const edgeData = await edgeResponse.json();
+                if (edgeData.success) {
+                    progressText.textContent = 'Report submitted successfully!';
                     progressText.style.color = '#4caf50';
+                    this.addSystemMessage('Missing person report submitted successfully. AI characteristics extracted for future matching.');
                     setTimeout(() => {
                         this.closeModal(document.getElementById('missing-person-modal'));
                         form.reset();
@@ -2427,8 +2460,9 @@ class RapidCareApp {
                         progressText.style.color = '';
                     }, 1500);
                 } else {
-                    throw new Error(data.error || 'Unknown error from Edge AI');
+                    throw new Error(edgeData.error || 'Unknown error from local API');
                 }
+                return;
             } else {
                 // Use existing /api/missing-persons endpoint
                 const formData = new FormData();

@@ -498,19 +498,44 @@ See `EdgeAIHTTPServer.java` in this repo for a reference implementation. The ser
 
 ### 3. Start the server in your MainActivity
 ```java
+package com.nomadichacker.emr;
+
+import android.os.Bundle;
+import android.webkit.WebSettings;
+import android.webkit.WebView;
+import android.webkit.WebViewClient;
+import androidx.appcompat.app.AppCompatActivity;
+import android.util.Log;
+
 public class MainActivity extends AppCompatActivity {
-    EdgeAIHTTPServer server;
+    private WebView webView;
+    private EdgeAIHTTPServer server;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // Start the Edge AI HTTP server
         server = new EdgeAIHTTPServer(this);
         try {
             server.start();
             Log.d("EdgeAI", "HTTP server started on port 12345");
-        } catch (IOException e) {
+        } catch (Exception e) {
             Log.e("EdgeAI", "Failed to start HTTP server", e);
         }
+
+        // Set up the WebView
+        webView = new WebView(this);
+        setContentView(webView);
+
+        WebSettings webSettings = webView.getSettings();
+        webSettings.setJavaScriptEnabled(true);
+        WebView.setWebContentsDebuggingEnabled(true);
+
+        webView.setWebViewClient(new WebViewClient());
+        webView.loadUrl("https://emr.nomadichacker.com/");
     }
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
@@ -518,27 +543,38 @@ public class MainActivity extends AppCompatActivity {
             server.stop();
         }
     }
+
+    @Override
+    public void onBackPressed() {
+        if (webView.canGoBack()) {
+            webView.goBack();
+        } else {
+            super.onBackPressed();
+        }
+    }
 }
 ```
 
-### 4. Add Internet Permission
+3. **Update the Manifest**
+   - In `AndroidManifest.xml`, ensure your `<activity>` tag points to `.MainActivity`:
+
 ```xml
-<uses-permission android:name="android.permission.INTERNET" />
+<activity android:name=".MainActivity">
+    <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+    </intent-filter>
+</activity>
 ```
 
-### 5. (Optional) Expose @JavascriptInterface for direct PWA-to-Android calls
-In your `MainActivity.kt` or `.java`:
-```kotlin
-@JavascriptInterface
-fun generateEdgeAiResponse(prompt: String): String {
-    val result = task.generate(prompt)
-    return result.text
-}
-// Register:
-webView.addJavascriptInterface(this, "EdgeAI")
-```
+4. **Sync and Build**
+   - Click **Sync Project with Gradle Files** in Android Studio.
+   - Build and run your app.
+
+5. **(Optional) Remove Kotlin Dependencies**
+   - If you are not using any other Kotlin files, you can remove Kotlin dependencies from your `build.gradle`.
 
 ---
 
-This setup allows your Python backend to auto-detect and use Edge AI on Android devices running your app.
+If you see build errors like `Unable to find Gradle tasks to build: []. Build mode: COMPILE_JAVA.`, make sure you have synced your project and that your Java files are in the correct package directory. Try **Build → Clean Project** and **Build → Rebuild Project** in Android Studio.
 

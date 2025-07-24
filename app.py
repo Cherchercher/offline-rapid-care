@@ -1689,6 +1689,51 @@ def missing_persons_api():
             'error': str(e)
         }), 500
 
+@app.route('/api/missing-persons/edge', methods=['POST'])
+def add_missing_person_edge():
+    """Add a missing person from Edge AI mode (JSON, base64 image, AI characteristics)"""
+    try:
+        data = request.get_json(force=True)
+        name = data.get('name', '')
+        age = data.get('age')
+        description = data.get('description', '')
+        contact_info = data.get('contact_info', '')
+        reported_by = data.get('reported_by', 'REUNIFICATION_COORDINATOR')
+        image_base64 = data.get('image_base64')
+        ai_characteristics = data.get('ai_characteristics', {})
+
+        # Save image to uploads
+        image_path = None
+        if image_base64:
+            import base64, uuid
+            image_bytes = base64.b64decode(image_base64)
+            filename = f"missing_person_{uuid.uuid4()}.jpg"
+            image_path = os.path.join('uploads', filename)
+            with open(image_path, 'wb') as f:
+                f.write(image_bytes)
+        
+        # Prepare person data
+        person_data = {
+            'name': name,
+            'age': age,
+            'description': description,
+            'image_path': image_path,
+            'contact_info': contact_info,
+            'reported_by': reported_by,
+            'status': 'missing',
+            'characteristics': ai_characteristics or {}
+        }
+        person_id = db_manager.add_missing_person(person_data)
+        return jsonify({
+            'success': True,
+            'person_id': person_id,
+            'message': 'Missing person added successfully (edge)'
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/api/transcribe-audio', methods=['POST'])
 def transcribe_audio():
     """Transcribe audio using Gemma 3n"""
