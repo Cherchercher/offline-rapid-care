@@ -2386,7 +2386,7 @@ class RapidCareApp {
                 const timeoutId = setTimeout(() => controller.abort(), 300000);
                 let aiCharacteristics = {};
                 try {
-                    response = await fetch('http://192.168.0.15:12345/edgeai_image', {
+                    response = await fetch('https://ba2c59444efb.ngrok-free.app/edgeai_image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
