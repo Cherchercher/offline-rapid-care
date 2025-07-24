@@ -2148,7 +2148,7 @@ class RapidCareApp {
         messageDiv.innerHTML = `
             <div class="message-content">
                 <i class="fas fa-info-circle"></i>
-                <span>${message}</span>
+                <div>${message}</div>
             </div>
         `;
         content.appendChild(messageDiv);
@@ -2381,6 +2381,14 @@ class RapidCareApp {
                     reader.readAsDataURL(file);
                 });
                 const imageBase64 = await toBase64(file);
+                // Log the first and last 100 characters of the base64 data for debugging
+                let b64Preview = '';
+                if (imageBase64.length > 200) {
+                    b64Preview = imageBase64.slice(0, 100) + '...' + imageBase64.slice(-100);
+                } else {
+                    b64Preview = imageBase64;
+                }
+                console.log(`Base64 image preview: ${b64Preview} (length: ${imageBase64.length})`);
                 updateProgress(2, 'Sending to Edge AI...');
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 300000);
@@ -2390,7 +2398,7 @@ class RapidCareApp {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
-                            prompt: PROMPTS.CHARACTERISTIC_EXTRACTION,
+                            prompt: PROMPTS.CHARACTERISTIC_EXTRACTION_PROMPT,
                             image: imageBase64,
                             model: 'gemma3n_e4b_it'
                         }),
@@ -2422,8 +2430,8 @@ class RapidCareApp {
                 } else {
                     throw new Error(data.error || 'Unknown error from Edge AI');
                 }
-                // Display extracted characteristics to the user
-                this.displayExtractedCharacteristics(aiCharacteristics);
+                // Display extracted characteristics to the user in a modal and wait for confirmation
+                await this.reviewExtractedCharacteristics(aiCharacteristics, file);
                 // Now submit to local API to store the record
                 updateProgress(4, 'Saving to local database...');
                 const edgeResponse = await fetch('/api/missing-persons/edge', {
@@ -2671,8 +2679,14 @@ class RapidCareApp {
             }
             html += '</ul></li>';
         }
-        if (characteristics.distinctive_features && characteristics.distinctive_features.length) {
-            html += `<li><strong>Distinctive Features:</strong> <b>${characteristics.distinctive_features.join(', ')}</b></li>`;
+        if (characteristics.distinctive_features) {
+            if (Array.isArray(characteristics.distinctive_features)) {
+                if (characteristics.distinctive_features.length) {
+                    html += `<li><strong>Distinctive Features:</strong> <b>${characteristics.distinctive_features.join(', ')}</b></li>`;
+                }
+            } else if (typeof characteristics.distinctive_features === 'string' && characteristics.distinctive_features.trim()) {
+                html += `<li><strong>Distinctive Features:</strong> <b>${characteristics.distinctive_features}</b></li>`;
+            }
         }
         if (characteristics.age_range) {
             html += `<li><strong>Age Range:</strong> <b>${characteristics.age_range}</b></li>`;
@@ -2681,6 +2695,80 @@ class RapidCareApp {
         // Show in system message (or you could use a modal)
         this.addSystemMessage(html);
     }
+
+    // Add this method to the RapidCareApp class
+    reviewExtractedCharacteristics(characteristics, file) {
+        return new Promise((resolve) => {
+            // Create modal if it doesn't exist
+            let modal = document.getElementById('characteristics-review-modal');
+            if (!modal) {
+                modal = document.createElement('div');
+                modal.id = 'characteristics-review-modal';
+                modal.className = 'modal show';
+                modal.innerHTML = `
+                    <div class="modal-content" style="max-width: 480px;">
+                        <div class="modal-header">
+                            <h3>Review & Edit Extracted Characteristics</h3>
+                        </div>
+                        <div class="modal-body" id="characteristics-review-body"></div>
+                        <div class="modal-footer" style="text-align: right;">
+                            <button id="characteristics-continue-btn" class="btn-primary">Continue</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+            }
+            // Fill in the characteristics
+            const body = modal.querySelector('#characteristics-review-body');
+            body.innerHTML = '';
+            let imageUrl = '';
+            if (file) {
+                imageUrl = URL.createObjectURL(file);
+            }
+            let html = '';
+            if (imageUrl) {
+                html += `<div style="text-align:center; margin-bottom:1.2rem;">
+                    <img src="${imageUrl}" alt="Uploaded photo" style="max-width:220px; max-height:220px; border-radius:0.5rem; box-shadow:0 2px 12px rgba(0,0,0,0.10); border:2px solid #eee;" />
+                </div>`;
+            }
+            if (!characteristics || Object.keys(characteristics).length === 0) {
+                html += '<p>No characteristics extracted from the image.</p>';
+            } else {
+                html += '<form id="characteristics-edit-form"><div class="extracted-characteristics-card" style="background:#f9f9fa; border-radius:0.5rem; padding:1rem 1.2rem; box-shadow:0 1px 6px rgba(0,0,0,0.06); margin-bottom:0.5rem;">';
+                html += '<ul style="list-style:none; padding:0; margin:0;">';
+                for (const [k, v] of Object.entries(characteristics)) {
+                    if (v === null || v === undefined || v === '' || v === 'unknown') continue;
+                    const label = k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                    html += `<li style="margin-bottom:0.5rem;"><strong>${label}:</strong> <input type="text" name="${k}" value="${v}" style="width:70%; margin-left:0.5rem;" /></li>`;
+                }
+                html += '</ul></div></form>';
+            }
+            body.innerHTML = html;
+            // Show modal
+            modal.classList.add('show');
+            document.body.style.overflow = 'hidden';
+            // Continue button
+            const continueBtn = modal.querySelector('#characteristics-continue-btn');
+            continueBtn.onclick = () => {
+                // Collect edited values
+                const form = modal.querySelector('#characteristics-edit-form');
+                if (form && characteristics) {
+                    for (const k of Object.keys(characteristics)) {
+                        const input = form.querySelector(`[name="${k}"]`);
+                        if (input) characteristics[k] = input.value;
+                    }
+                }
+                modal.classList.remove('show');
+                document.body.style.overflow = '';
+                if (imageUrl) {
+                    setTimeout(() => {
+                        URL.revokeObjectURL(imageUrl);
+                    }, 200);
+                }
+                resolve();
+            };
+        });
+    };
 }
 
 // Initialize app when DOM is loaded
@@ -2721,11 +2809,8 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="pulse-circle">
                 <div class="medical-cross">+</div>
             </div>
-            <div style="margin-top:2rem; font-size:2rem; font-weight:700; letter-spacing:1px; display: flex; flex-direction: column; align-items: center;">
-                <span style="display: flex; align-items: center; gap: 0.5rem;">
-                    <svg width="36" height="36" viewBox="0 0 48 48" style="vertical-align: middle;"><g><path fill="#4285F4" d="M43.611 20.083H42V20H24v8h11.303C33.978 32.708 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.73 0 5.23.936 7.207 2.482l6.121-6.121C33.527 5.537 28.977 4 24 4c-6.627 0-12 5.373-12 12 0 1.341.138 2.651.306 3.691z"/><path fill="#34A853" d="M6.306 14.691l6.571 4.819C14.655 16.104 19.001 13 24 13c2.73 0 5.23.936 7.207 2.482l6.121-6.121C33.527 5.537 28.977 4 24 4c-6.627 0-12 5.373-12 12 0 1.341.138 2.651.306 3.691z"/><path fill="#FBBC05" d="M24 44c5.418 0 9.978-3.292 11.303-8.083l-8.303-6.417C25.23 33.064 22.73 34 20 34c-4.999 0-9.345-3.104-11.123-7.51l-6.571 4.819C8.954 40.463 19.003 44 24 44z"/><path fill="#EA4335" d="M43.611 20.083H42V20H24v8h11.303C33.978 32.708 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c2.73 0 5.23.936 7.207 2.482l6.121-6.121C33.527 5.537 28.977 4 24 4 12.954 4 4 12.954 4 24s8.954 20 20 20c10.998 0 19.837-7.998 19.837-20 0-1.341-.138-2.651-.226-3.917z" opacity=".15"/></g></svg>
-                    <span>Powered by Google AI Edge</span>
-                </span>
+            <div style="margin-top:2rem; display: flex; flex-direction: column; align-items: center;">
+                <span style="font-size:2rem; font-weight:700; letter-spacing:1px;">Powered by Google AI Edge</span>
             </div>
             <div style="font-size:1.2rem; margin-top:0.5rem;">Emergency Medicine Mode</div>
         </div>

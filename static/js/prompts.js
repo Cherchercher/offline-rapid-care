@@ -30,29 +30,32 @@ Categories:
 
 Format your response as:
 **Triage: [CATEGORY]** **Reasoning:** [Clear explanation] **Action:** [Specific steps]`,
-
-    CHARACTERISTIC_EXTRACTION: `Analyze this person and provide a structured description in the following JSON format:
+CHARACTERISTIC_EXTRACTION_PROMPT : `Analyze this person and provide a structured description in the following JSON format:
 
 {
-  "physical_features": {
-    "face_shape": "round/oval/square/heart",
-    "hair": "color, length, style",
-    "eyes": "color, shape",
-    "skin_tone": "light/medium/dark",
-    "height": "estimated",
-    "build": "slim/average/stocky"
-  },
-  "clothing": {
-    "top": "color, type",
-    "bottom": "color, type",
-    "accessories": "glasses, jewelry, etc."
-  },
-  "distinctive_features": "Any unique characteristics, scars, tattoos, etc.",
-  "age_range": "estimated age range"
+    "physical_features": {
+        "gender": "male/female/unknown",
+        "face_shape": "round/oval/square/heart",
+        "hair_color": "black/brown/blonde/red/gray/white",
+        "hair_length": "short/medium/long",
+        "hair_style": "straight/wavy/curly/bald",
+        "eye_color": "brown/blue/green/hazel/gray",
+        "skin_tone": "light/medium/dark",
+        "height": "estimated height in feet and inches",
+        "build": "slim/average/stocky/athletic"
+    },
+    "clothing": {
+        "top": "color and type of shirt/jacket",
+        "bottom": "color and type of pants/skirt",
+        "accessories": "glasses, jewelry, hat, etc."
+    },
+    "distinctive_features": [
+        "any scars, birthmarks, tattoos, piercings, or unique characteristics"
+    ],
+    "age_range": "estimated age range (e.g., 25-30, 40-45)"
 }
 
-Provide only the JSON object, no additional text.`,
-
+Provide only the JSON response, no additional text.`,
     REUNIFICATION_SEARCH: `You are a reunification coordinator searching for missing persons. Analyze the provided description and search the database for potential matches.
 
 Focus on:
