@@ -2338,11 +2338,17 @@ class RapidCareApp {
         console.log('🔍 Missing person form submitted');
         const form = event.target;
         const photoInput = document.getElementById('missing-person-photo-input');
-        const file = photoInput.files[0];
-        if (!file) {
+        const originalFile = photoInput.files[0];
+        if (!originalFile) {
             this.addSystemMessage('Please upload a photo of the missing person. The photo is required for AI-powered matching.');
             return;
         }
+        
+        // Create a fresh copy of the file to avoid caching issues
+        const file = new File([originalFile], originalFile.name, {
+            type: originalFile.type,
+            lastModified: originalFile.lastModified
+        });
         const progressIndicator = document.getElementById('missing-person-progress');
         const progressText = document.getElementById('progress-text');
         const submitBtn = form.querySelector('button[type="submit"]');
@@ -2391,10 +2397,10 @@ class RapidCareApp {
                 console.log(`Base64 image preview: ${b64Preview} (length: ${imageBase64.length})`);
                 updateProgress(2, 'Sending to Edge AI...');
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 300000);
+                const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
                 let aiCharacteristics = {};
                 try {
-                    response = await fetch('https://ba2c59444efb.ngrok-free.app/edgeai_image', {
+                    response = await fetch('https://770d59cec016.ngrok-free.app/edgeai_image', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -2486,7 +2492,7 @@ class RapidCareApp {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 updateProgress(2, 'Saving to database...');
                 const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 300000);
+                const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes
                 try {
                     response = await fetch('/api/missing-persons', {
                         method: 'POST',
@@ -2718,19 +2724,30 @@ class RapidCareApp {
                 `;
                 document.body.appendChild(modal);
             }
-            // Fill in the characteristics
+            
+            // Clear any existing content and revoke previous image URL
             const body = modal.querySelector('#characteristics-review-body');
             body.innerHTML = '';
-            let imageUrl = '';
-            if (file) {
-                imageUrl = URL.createObjectURL(file);
+            
+            // Create a fresh image URL and store it on the modal for cleanup
+            let imageUrl = null;
+            if (file && file instanceof File) {
+                try {
+                    imageUrl = URL.createObjectURL(file);
+                    // Store the URL on the modal for cleanup
+                    modal._currentImageUrl = imageUrl;
+                } catch (error) {
+                    console.warn('Failed to create object URL for file:', error);
+                }
             }
+            
             let html = '';
             if (imageUrl) {
                 html += `<div style="text-align:center; margin-bottom:1.2rem;">
-                    <img src="${imageUrl}" alt="Uploaded photo" style="max-width:220px; max-height:220px; border-radius:0.5rem; box-shadow:0 2px 12px rgba(0,0,0,0.10); border:2px solid #eee;" />
+                    <img src="${imageUrl}" alt="Uploaded photo" style="max-width:220px; max-height:220px; border-radius:0.5rem; box-shadow:0 2px 12px rgba(0,0,0,0.10); border:2px solid #eee;" onerror="this.style.display='none'; console.warn('Failed to load image preview');" />
                 </div>`;
             }
+            
             if (!characteristics || Object.keys(characteristics).length === 0) {
                 html += '<p>No characteristics extracted from the image.</p>';
             } else {
@@ -2744,9 +2761,11 @@ class RapidCareApp {
                 html += '</ul></div></form>';
             }
             body.innerHTML = html;
+            
             // Show modal
             modal.classList.add('show');
             document.body.style.overflow = 'hidden';
+            
             // Continue button
             const continueBtn = modal.querySelector('#characteristics-continue-btn');
             continueBtn.onclick = () => {
@@ -2758,13 +2777,19 @@ class RapidCareApp {
                         if (input) characteristics[k] = input.value;
                     }
                 }
+                
+                // Clean up image URL
+                if (modal._currentImageUrl) {
+                    try {
+                        URL.revokeObjectURL(modal._currentImageUrl);
+                        modal._currentImageUrl = null;
+                    } catch (error) {
+                        console.warn('Failed to revoke object URL:', error);
+                    }
+                }
+                
                 modal.classList.remove('show');
                 document.body.style.overflow = '';
-                if (imageUrl) {
-                    setTimeout(() => {
-                        URL.revokeObjectURL(imageUrl);
-                    }, 200);
-                }
                 resolve();
             };
         });
