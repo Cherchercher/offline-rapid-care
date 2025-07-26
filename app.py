@@ -537,8 +537,14 @@ def search_missing_persons():
         if not query:
             return jsonify({'error': 'No search query provided'}), 400
         
+        # Debug logging
+        print(f"🔍 Searching for missing persons with query: '{query}'")
+        print(f"🔍 Vector search available: {vector_search.is_available() if vector_search else False}")
+        
         # Search missing persons
         results = vector_search.search_missing_persons(query, limit)
+        
+        print(f"🔍 Search returned {len(results)} results")
         
         # Convert results to JSON-serializable format
         search_results = []
@@ -688,9 +694,15 @@ def calculate_characteristic_similarity(desc_characteristics: Dict, person_chara
         total_score = 0.0
         total_weight = 0.0
         
-        # Physical features comparison
+        # Physical features comparison - handle both nested and flat structures
         desc_physical = desc_characteristics.get('physical_features', {})
         person_physical = person_characteristics.get('physical_features', {})
+        
+        # If flat structure (Edge AI), use the characteristics directly
+        if not desc_physical and desc_characteristics:
+            desc_physical = desc_characteristics
+        if not person_physical and person_characteristics:
+            person_physical = person_characteristics
         
         physical_weights = {
             'gender': 0.30,  # Increased weight for gender
@@ -707,9 +719,23 @@ def calculate_characteristic_similarity(desc_characteristics: Dict, person_chara
                     total_score += weight
                 total_weight += weight
         
-        # Clothing comparison
+        # Clothing comparison - handle both nested and flat structures
         desc_clothing = desc_characteristics.get('clothing', {})
         person_clothing = person_characteristics.get('clothing', {})
+        
+        # If flat structure (Edge AI), look for clothing fields directly
+        if not desc_clothing and desc_characteristics:
+            desc_clothing = {
+                'top': desc_characteristics.get('top_clothing', ''),
+                'bottom': desc_characteristics.get('bottom_clothing', ''),
+                'accessories': desc_characteristics.get('accessories', '')
+            }
+        if not person_clothing and person_characteristics:
+            person_clothing = {
+                'top': person_characteristics.get('top_clothing', ''),
+                'bottom': person_characteristics.get('bottom_clothing', ''),
+                'accessories': person_characteristics.get('accessories', '')
+            }
         
         clothing_weights = {
             'top': 0.08,
@@ -723,9 +749,18 @@ def calculate_characteristic_similarity(desc_characteristics: Dict, person_chara
                     total_score += weight
                 total_weight += weight
         
-        # Distinctive features comparison
-        desc_distinctive = set(desc_characteristics.get('distinctive_features', []))
-        person_distinctive = set(person_characteristics.get('distinctive_features', []))
+        # Distinctive features comparison - handle both nested and flat structures
+        desc_distinctive = desc_characteristics.get('distinctive_features', [])
+        person_distinctive = person_characteristics.get('distinctive_features', [])
+        
+        # Handle string vs list for distinctive features
+        if isinstance(desc_distinctive, str):
+            desc_distinctive = [desc_distinctive] if desc_distinctive and desc_distinctive.lower() != 'none' else []
+        if isinstance(person_distinctive, str):
+            person_distinctive = [person_distinctive] if person_distinctive and person_distinctive.lower() != 'none' else []
+        
+        desc_distinctive = set(desc_distinctive)
+        person_distinctive = set(person_distinctive)
         
         if desc_distinctive and person_distinctive:
             intersection = desc_distinctive.intersection(person_distinctive)
@@ -1423,11 +1458,94 @@ def status():
     # Get model manager status
     model_status = model_manager.get_status()
     
+    # Get vector search status
+    vector_status = {
+        'available': vector_search.is_available() if vector_search else False,
+        'total_documents': 0
+    }
+    
+    if vector_search and vector_search.is_available():
+        try:
+            # Get collection count
+            collection = vector_search.collection
+            if collection:
+                vector_status['total_documents'] = collection.count()
+        except Exception as e:
+            vector_status['error'] = str(e)
+    
     return jsonify({
         'model_status': model_status,
         'patients_count': len(patients),
+        'vector_search': vector_status,
         'timestamp': datetime.now().isoformat()
     })
+
+@app.route('/api/debug/vector-search', methods=['GET'])
+def debug_vector_search():
+    """Debug endpoint to check vector search contents"""
+    try:
+        if not vector_search or not vector_search.is_available():
+            return jsonify({
+                'success': False,
+                'error': 'Vector search not available'
+            })
+        
+        # Get all documents in the collection
+        collection = vector_search.collection
+        if not collection:
+            return jsonify({
+                'success': False,
+                'error': 'Collection not available'
+            })
+        
+        # Get all documents
+        results = collection.get()
+        
+        return jsonify({
+            'success': True,
+            'total_documents': len(results['ids']) if results['ids'] else 0,
+            'document_types': [metadata.get('type', 'unknown') for metadata in results.get('metadatas', [])],
+            'sample_documents': results['documents'][:3] if results['documents'] else [],
+            'sample_metadata': results['metadatas'][:3] if results['metadatas'] else []
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/debug/rebuild-vector-index', methods=['POST'])
+def rebuild_vector_index():
+    """Rebuild the vector search index from database"""
+    try:
+        if not vector_search or not vector_search.is_available():
+            return jsonify({
+                'success': False,
+                'error': 'Vector search not available'
+            })
+        
+        # Clear existing index
+        vector_search.clear_index()
+        
+        # Rebuild from database
+        indexed_count = vector_search.bulk_index_from_database(db_manager)
+        
+        return jsonify({
+            'success': True,
+            'indexed_count': indexed_count,
+            'message': f'Rebuilt vector index with {indexed_count} documents'
+        })
+        
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/config', methods=['GET'])
 def get_config():
@@ -1738,6 +1856,13 @@ def add_missing_person_edge():
             'status': 'missing',
             'characteristics': ai_characteristics or {}
         }
+        
+        # Debug logging
+        print(f"🔍 Adding missing person with characteristics: {ai_characteristics}")
+        print(f"🔍 Characteristics type: {type(ai_characteristics)}")
+        print(f"🔍 Characteristics keys: {list(ai_characteristics.keys()) if isinstance(ai_characteristics, dict) else 'Not a dict'}")
+        print(f"🔍 Vector search available: {vector_search.is_available() if vector_search else False}")
+        
         person_id = db_manager.add_missing_person(person_data)
         return jsonify({
             'success': True,
