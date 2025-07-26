@@ -33,25 +33,19 @@ Format your response as:
 CHARACTERISTIC_EXTRACTION_PROMPT : `Analyze this person and provide a structured description in the following JSON format:
 
 {
-    "physical_features": {
-        "gender": "male/female/unknown",
-        "face_shape": "round/oval/square/heart",
-        "hair_color": "black/brown/blonde/red/gray/white",
-        "hair_length": "short/medium/long",
-        "hair_style": "straight/wavy/curly/bald",
-        "eye_color": "brown/blue/green/hazel/gray",
-        "skin_tone": "light/medium/dark",
-        "height": "estimated height in feet and inches",
-        "build": "slim/average/stocky/athletic"
-    },
-    "clothing": {
-        "top": "color and type of shirt/jacket",
-        "bottom": "color and type of pants/skirt",
-        "accessories": "glasses, jewelry, hat, etc."
-    },
-    "distinctive_features": [
-        "any scars, birthmarks, tattoos, piercings, or unique characteristics"
-    ],
+    "gender": "male/female/unknown",
+    "face_shape": "round/oval/square/heart",
+    "hair_color": "black/brown/blonde/red/gray/white",
+    "hair_length": "short/medium/long",
+    "hair_style": "straight/wavy/curly/bald",
+    "eye_color": "brown/blue/green/hazel/gray",
+    "skin_tone": "light/medium/dark",
+    "height": "estimated height in feet and inches",
+    "build": "slim/average/stocky/athletic",
+    "top_clothing": "color and type of shirt/jacket",
+    "bottom_clothing": "color and type of pants/skirt",
+    "accessories": "glasses, jewelry, hat, etc.",
+    "distinctive_features": "any scars, birthmarks, tattoos, piercings, or unique characteristics",
     "age_range": "estimated age range (e.g., 25-30, 40-45)"
 }
 

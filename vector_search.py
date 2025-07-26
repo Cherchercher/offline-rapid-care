@@ -128,16 +128,47 @@ class VectorSearchManager:
         elif data_type == "missing_person":
             # Enhanced missing person content with characteristics
             characteristics = data.get('characteristics', {})
-            physical = characteristics.get('physical_features', {})
-            clothing = characteristics.get('clothing', {})
-            distinctive = characteristics.get('distinctive_features', [])
+            
+            # Handle both nested and flat characteristic structures
+            if 'physical_features' in characteristics:
+                # Nested structure
+                physical = characteristics.get('physical_features', {})
+                clothing = characteristics.get('clothing', {})
+                distinctive = characteristics.get('distinctive_features', [])
+                gender = physical.get('gender', 'Unknown')
+                age_range = characteristics.get('age_range', 'Unknown')
+                face_shape = physical.get('face_shape', 'Unknown')
+                hair_color = physical.get('hair_color', 'Unknown')
+                hair_length = physical.get('hair_length', '')
+                eye_color = physical.get('eye_color', 'Unknown')
+                skin_tone = physical.get('skin_tone', 'Unknown')
+                height = physical.get('height', 'Unknown')
+                build = physical.get('build', 'Unknown')
+                top_clothing = clothing.get('top', 'Unknown')
+                bottom_clothing = clothing.get('bottom', 'Unknown')
+                accessories = clothing.get('accessories', 'None')
+            else:
+                # Flat structure (from Edge AI)
+                gender = characteristics.get('gender', 'Unknown')
+                age_range = characteristics.get('age_range', 'Unknown')
+                face_shape = characteristics.get('face_shape', 'Unknown')
+                hair_color = characteristics.get('hair_color', 'Unknown')
+                hair_length = characteristics.get('hair_length', '')
+                eye_color = characteristics.get('eye_color', 'Unknown')
+                skin_tone = characteristics.get('skin_tone', 'Unknown')
+                height = characteristics.get('height', 'Unknown')
+                build = characteristics.get('build', 'Unknown')
+                top_clothing = characteristics.get('top_clothing', 'Unknown')
+                bottom_clothing = characteristics.get('bottom_clothing', 'Unknown')
+                accessories = characteristics.get('accessories', 'None')
+                distinctive = characteristics.get('distinctive_features', 'None')
             
             return f"""
             Missing Person: {data.get('name', 'Unknown')}
-            Gender: {physical.get('gender', 'Unknown')} | Age: {data.get('age', 'Unknown')} | Age Range: {characteristics.get('age_range', 'Unknown')}
-            Physical Features: Face shape {physical.get('face_shape', 'Unknown')}, Hair {physical.get('hair_color', 'Unknown')} {physical.get('hair_length', '')}, Eyes {physical.get('eye_color', 'Unknown')}, Skin {physical.get('skin_tone', 'Unknown')}, Height {physical.get('height', 'Unknown')}, Build {physical.get('build', 'Unknown')}
-            Clothing: Top {clothing.get('top', 'Unknown')}, Bottom {clothing.get('bottom', 'Unknown')}, Accessories {clothing.get('accessories', 'None')}
-            Distinctive Features: {', '.join(distinctive) if distinctive else 'None'}
+            Gender: {gender} | Age: {data.get('age', 'Unknown')} | Age Range: {age_range}
+            Physical Features: Face shape {face_shape}, Hair {hair_color} {hair_length}, Eyes {eye_color}, Skin {skin_tone}, Height {height}, Build {build}
+            Clothing: Top {top_clothing}, Bottom {bottom_clothing}, Accessories {accessories}
+            Distinctive Features: {distinctive}
             Description: {data.get('description', '')}
             Contact Info: {data.get('contact_info', '')}
             Reported By: {data.get('reported_by', 'Unknown')}
@@ -321,6 +352,11 @@ class VectorSearchManager:
             
             if not embedding:
                 return False
+            
+            # Debug logging
+            logger.info(f"🔍 Indexing missing person {person_id}")
+            logger.info(f"🔍 Characteristics: {person_data.get('characteristics', {})}")
+            logger.info(f"🔍 Content length: {len(content)}")
             
             # Prepare metadata and sanitize values
             metadata = {
