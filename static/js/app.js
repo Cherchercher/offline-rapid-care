@@ -18,9 +18,7 @@ class RapidCareApp {
         this.updateStatusIndicators();
         this.loadPatients();
         
-        // Initialize system messages as collapsed
-        const systemMessages = document.getElementById('system-messages');
-        systemMessages.classList.add('collapsed');
+        // System messages have been removed from the UI
         this.updateSystemMessagesCount();
         
         // Check if user is already logged in
@@ -216,18 +214,7 @@ class RapidCareApp {
             this.showPatientsList();
         });
 
-        // System messages toggle
-        document.getElementById('system-messages-header').addEventListener('click', (e) => {
-            if (!e.target.closest('.clear-messages-btn')) {
-                this.toggleSystemMessages();
-            }
-        });
-
-        // Clear messages button
-        document.getElementById('clear-messages-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            this.clearSystemMessages();
-        });
+        // System messages have been removed from the UI
 
         // Stop recording button
         document.getElementById('stop-recording-btn').addEventListener('click', () => {
@@ -657,15 +644,7 @@ class RapidCareApp {
         this.currentRole = null;
         localStorage.removeItem('rapidcare_role');
         
-        // Clear system messages
-        document.getElementById('system-messages').innerHTML = `
-            <div class="message system">
-                <div class="message-content">
-                    <i class="fas fa-info-circle"></i>
-                    <span>System ready. Select an action to begin.</span>
-                </div>
-            </div>
-        `;
+        // System messages have been removed from the UI
 
         // Show login screen
         document.getElementById('main-app').classList.add('hidden');
@@ -771,6 +750,11 @@ class RapidCareApp {
         
         if (this.isRecording) {
             this.stopRecording();
+        }
+        
+        // Clear media modal content when closing
+        if (modal.id === 'media-modal') {
+            this.clearMediaModal();
         }
     }
 
@@ -1119,7 +1103,9 @@ class RapidCareApp {
                     <div class="file-info">
                         <i class="fas fa-video"></i>
                         <span>${file.name}</span>
-                        <button class="analyze-file-btn" data-file="${file.name}">Analyze</button>
+                        <button class="remove-file-btn" data-file="${file.name}" title="Remove file">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
                 `;
             } else if (file.type.startsWith('image/')) {
@@ -1132,7 +1118,9 @@ class RapidCareApp {
                     <div class="file-info">
                         <i class="fas fa-image"></i>
                         <span>${file.name}</span>
-                        <button class="analyze-file-btn" data-file="${file.name}">Analyze</button>
+                        <button class="remove-file-btn" data-file="${file.name}" title="Remove file">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
                 `;
             } else {
@@ -1141,16 +1129,18 @@ class RapidCareApp {
                     <div class="file-info">
                 <i class="fas fa-file"></i>
                 <span>${file.name}</span>
-                <button class="analyze-file-btn" data-file="${file.name}">Analyze</button>
+                <button class="remove-file-btn" data-file="${file.name}" title="Remove file">
+                    <i class="fas fa-times"></i>
+                </button>
                     </div>
             `;
             }
             
             fileList.appendChild(fileItem);
 
-            // Add analyze button event
-            fileItem.querySelector('.analyze-file-btn').addEventListener('click', () => {
-                this.analyzeFile(file);
+            // Add remove button event
+            fileItem.querySelector('.remove-file-btn').addEventListener('click', () => {
+                fileItem.remove();
             });
         });
     }
@@ -1288,15 +1278,12 @@ class RapidCareApp {
         analyzeBtn.disabled = true;
         analyzeBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Analyzing...';
 
-        // For now, analyze the first file
-        const firstFile = files[0];
-        const fileName = firstFile.querySelector('.analyze-file-btn').dataset.file;
-        
-        // Find the actual file object
+        // Analyze all files in the list
         const fileInput = document.getElementById('file-input');
-        const file = Array.from(fileInput.files).find(f => f.name === fileName);
+        const fileArray = Array.from(fileInput.files);
         
-        if (file) {
+        if (fileArray.length > 0) {
+            const file = fileArray[0]; // Analyze first file for now
             if (file.type.startsWith('image/')) {
                 this.analyzeImage(file).finally(() => {
                     // Re-enable button
@@ -1315,10 +1302,36 @@ class RapidCareApp {
                 analyzeBtn.innerHTML = '<i class="fas fa-brain"></i> Analyze Media';
             }
         } else {
-            this.addSystemMessage('Error: File not found');
+            this.addSystemMessage('Error: No files found');
             analyzeBtn.disabled = false;
             analyzeBtn.innerHTML = '<i class="fas fa-brain"></i> Analyze Media';
         }
+    }
+
+    clearMediaModal() {
+        // Clear file list
+        const fileList = document.getElementById('file-list');
+        fileList.innerHTML = '';
+        
+        // Clear file input
+        const fileInput = document.getElementById('file-input');
+        fileInput.value = '';
+        
+        // Clear recorded video preview
+        this.clearRecordedVideoPreview();
+        
+        // Reset camera preview
+        const video = document.getElementById('camera-preview');
+        if (video.srcObject) {
+            video.srcObject = null;
+        }
+        
+        // Reset recording buttons
+        document.getElementById('record-btn').style.display = 'inline-block';
+        document.getElementById('stop-record-btn').style.display = 'none';
+        
+        // Switch back to camera tab
+        this.switchTab('camera');
     }
 
     showTriageResult(analysis) {
@@ -2204,55 +2217,24 @@ class RapidCareApp {
     }
 
     toggleSystemMessages() {
-        const systemMessages = document.getElementById('system-messages');
-        systemMessages.classList.toggle('collapsed');
+        // System messages have been removed from the UI
+        return;
     }
 
     clearSystemMessages() {
-        const content = document.getElementById('system-messages-content');
-        content.innerHTML = '';
-        this.updateSystemMessagesCount();
+        // System messages have been removed from the UI
+        return;
     }
 
     addSystemMessage(message) {
-        const content = document.getElementById('system-messages-content');
-        if (!content) {
-            console.warn('System messages content element not found');
-            return;
-        }
-        
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message system';
-        messageDiv.innerHTML = `
-            <div class="message-content">
-                <i class="fas fa-info-circle"></i>
-                <div>${message}</div>
-            </div>
-        `;
-        content.appendChild(messageDiv);
-        this.updateSystemMessagesCount();
-        
-        // Auto-collapse after 5 seconds if it's a welcome message
-        if (message.includes('Welcome') || message.includes('System ready')) {
-            setTimeout(() => {
-                const systemMessages = document.getElementById('system-messages');
-                if (systemMessages && !systemMessages.classList.contains('collapsed')) {
-                    systemMessages.classList.add('collapsed');
-                }
-            }, 5000);
-        }
+        // System messages have been removed from the UI, so we'll just log to console
+        console.log('System message:', message);
+        return;
     }
 
     updateSystemMessagesCount() {
-        const content = document.getElementById('system-messages-content');
-        const countSpan = document.getElementById('system-messages-count');
-        
-        if (!content || !countSpan) {
-            return;
-        }
-        
-        const count = content.children.length;
-        countSpan.textContent = `${count} message${count !== 1 ? 's' : ''}`;
+        // System messages have been removed from the UI
+        return;
     }
 
     async updateStatusIndicators() {

@@ -27,6 +27,10 @@ body {
     line-height: 1.6;
     color: var(--text-primary);
     background-color: var(--bg-secondary);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 /* Header */
@@ -42,17 +46,27 @@ body {
 .header-content {
     max-width: 1200px;
     margin: 0 auto;
-    padding: 0 20px;
+    padding: 0 15px;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 1rem;
+}
+
+.header-status-row {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 8px 15px;
+    border-top: 1px solid #e5e7eb;
+    background: rgba(249, 250, 251, 0.8);
 }
 
 .user-info {
     display: flex;
     align-items: center;
-    gap: 1rem;
+    gap: 0.75rem;
     color: var(--text-primary);
+    flex-wrap: wrap;
 }
 
 .welcome-message {
@@ -65,26 +79,24 @@ body {
     background: #ef4444;
     color: white;
     border: none;
-    padding: 8px 16px;
-    border-radius: 8px;
+    padding: 6px 12px;
+    border-radius: 6px;
     cursor: pointer;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     transition: background-color 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    white-space: nowrap;
 }
 
 .logout-btn:hover {
     background: #dc2626;
 }
 
-/* System Messages */
+/* System Messages - Hidden */
 .system-messages {
-    max-width: 1200px;
-    margin: 20px auto;
-    padding: 0 20px;
-    background: white;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-    border: 1px solid #e5e7eb;
+    display: none !important;
 }
 
 .system-messages-header {
@@ -369,13 +381,317 @@ body {
     }
     
     .header-content {
-        flex-direction: column;
-        gap: 15px;
+        flex-direction: row;
+        gap: 10px;
+        align-items: center;
+        justify-content: space-between;
+    }
+    
+    .header-status-row {
+        padding: 6px 15px;
     }
     
     .user-info {
-        flex-direction: column;
-        gap: 10px;
+        flex-direction: row;
+        gap: 8px;
+        justify-content: flex-end;
+    }
+    
+    .welcome-text {
+        display: none; /* Hide welcome text on mobile to save space */
+    }
+    
+    .voice-btn-text {
+        display: none; /* Hide "Voice" text, show only icon */
+    }
+    
+    .logout-text {
+        display: none; /* Hide "Logout" text, show only icon */
+    }
+    
+    .voice-input-btn {
+        padding: 6px 8px;
+        min-width: auto;
+    }
+    
+    .logout-btn {
+        padding: 6px 8px;
+        min-width: auto;
+    }
+    
+    /* Mobile-friendly status indicators */
+    .status-indicators {
+        flex-wrap: wrap;
+        gap: 8px;
+        justify-content: center;
+    }
+    
+    .header-status-row {
+        padding: 5px 15px;
+    }
+    
+    .status-item {
+        font-size: 0.75rem;
+        padding: 6px 8px;
+        gap: 4px;
+        min-width: auto;
+        flex-shrink: 0;
+        cursor: pointer; /* Make touchable on mobile */
+    }
+    
+    .status-item span {
+        display: none; /* Hide text on mobile, show only icons */
+    }
+    
+    .status-item i {
+        font-size: 0.8rem;
+    }
+    
+    /* Show text on larger mobile screens */
+    @media (min-width: 480px) {
+        .status-item span {
+            display: inline;
+        }
+        
+        .status-item {
+            font-size: 0.8rem;
+            padding: 8px 10px;
+        }
+        
+        .voice-btn-text {
+            display: inline; /* Show "Voice" text on larger mobile */
+        }
+        
+        .logout-text {
+            display: inline; /* Show "Logout" text on larger mobile */
+        }
+        
+        .welcome-text {
+            display: inline; /* Show welcome text on larger mobile */
+        }
+    }
+    
+    /* Very small screens - icon only with tooltip */
+    @media (max-width: 360px) {
+        .status-indicators {
+            gap: 4px;
+        }
+        
+        .status-item {
+            padding: 4px 6px;
+            border-radius: 4px;
+        }
+        
+        .status-item i {
+            font-size: 0.7rem;
+        }
+        
+        .logo h1 {
+            font-size: 1.25rem;
+        }
+        
+        .logo i {
+            font-size: 1.25rem;
+        }
+        
+        .header-content {
+            padding: 0 10px;
+        }
+    }
+    
+    /* Mobile optimizations for other components */
+    
+    .action-grid {
+        gap: 15px;
+        padding: 0 15px;
+    }
+    
+    .action-card {
+        padding: 20px 15px;
+    }
+    
+    .patient-section {
+        margin: 20px 15px;
+    }
+    
+    .modal-content {
+        margin: 10px;
+        width: calc(100% - 20px);
+        max-height: calc(100vh - 20px);
+    }
+    
+    .chat-input-container {
+        padding: 10px 15px;
+    }
+    
+    .message-input {
+        font-size: 16px; /* Prevents zoom on iOS */
+    }
+    
+    .voice-btn, .send-btn {
+        min-width: 44px; /* Better touch target */
+        min-height: 44px;
+    }
+    
+    .media-tabs {
+        flex-wrap: wrap;
+        gap: 5px;
+    }
+    
+    .tab-btn {
+        padding: 8px 12px;
+        font-size: 0.9rem;
+    }
+    
+    .upload-area {
+        padding: 30px 20px;
+    }
+    
+    .file-item {
+        padding: 10px;
+    }
+    
+    .patient-card {
+        padding: 15px;
+    }
+    
+    .btn-primary, .btn-secondary {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+        min-height: 44px; /* Better touch target */
+    }
+    
+    /* Prevent text selection on interactive elements */
+    .action-card, .patient-card, .voice-input-btn, .logout-btn {
+        -webkit-user-select: none;
+        -moz-user-select: none;
+        -ms-user-select: none;
+        user-select: none;
+    }
+    
+    /* Improve scrolling performance */
+    .chat-messages, .system-messages-content, .all-patients-list {
+        -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Optimize for mobile performance */
+    .action-card:hover, .patient-card:hover {
+        transform: none; /* Disable hover effects on mobile */
+    }
+    
+    /* Better mobile form inputs */
+    input, textarea, select {
+        font-size: 16px; /* Prevents zoom on iOS */
+        -webkit-appearance: none;
+        border-radius: 0;
+    }
+    
+    /* Mobile-friendly dropdowns */
+    .voice-dropdown-menu {
+        min-width: 250px;
+        max-width: 90vw;
+    }
+    
+    /* Mobile-optimized modals */
+    .modal {
+        padding: 10px;
+    }
+    
+    /* Better mobile spacing */
+    .main-content {
+        padding: 0;
+    }
+    
+    /* Mobile-friendly patient cards */
+    .patient-card {
+        margin-bottom: 10px;
+    }
+    
+    /* Mobile-optimized action grid */
+    .action-grid {
+        margin: 15px 0;
+    }
+    
+    /* Mobile-friendly status indicators */
+    .status-indicators {
+        margin: 10px 0;
+    }
+    
+    /* Landscape orientation optimizations */
+    @media (max-width: 768px) and (orientation: landscape) {
+        .header {
+            padding: 10px 0;
+        }
+        
+        .header-content {
+            gap: 8px;
+        }
+        
+        .header-status-row {
+            padding: 3px 15px;
+        }
+        
+        .logo h1 {
+            font-size: 1.25rem;
+        }
+        
+        .logo i {
+            font-size: 1.25rem;
+        }
+        
+
+        
+        .action-grid {
+            gap: 10px;
+        }
+        
+        .action-card {
+            padding: 15px 10px;
+        }
+    }
+    
+    /* Extra small screens */
+    @media (max-width: 320px) {
+        .header-content {
+            padding: 0 5px;
+        }
+        
+        .header-status-row {
+            padding: 3px 5px;
+        }
+        
+        .logo h1 {
+            font-size: 1rem;
+        }
+        
+        .logo i {
+            font-size: 1rem;
+        }
+        
+        .logo {
+            gap: 5px;
+        }
+        
+        .user-info {
+            gap: 5px;
+        }
+        
+        .voice-input-btn, .logout-btn {
+            padding: 4px 6px;
+        }
+        
+        .status-indicators {
+            gap: 3px;
+        }
+        
+        .status-item {
+            padding: 3px 5px;
+            font-size: 0.7rem;
+        }
+        
+        .status-item i {
+            font-size: 0.6rem;
+        }
     }
 }
 
@@ -892,6 +1208,46 @@ body {
 
 .analyze-file-btn:hover {
     background: #1d4ed8;
+}
+
+.remove-file-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background-color 0.2s;
+    margin-left: auto;
+}
+
+.remove-file-btn:hover {
+    background: #dc2626;
+}
+
+.remove-file-btn i {
+    font-size: 0.75rem;
+}
+
+.remove-file-btn {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 0.25rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background-color 0.2s;
+    margin-left: auto;
+}
+
+.remove-file-btn:hover {
+    background: #dc2626;
+}
+
+.remove-file-btn i {
+    font-size: 0.75rem;
 }
 
 /* AI Search Styles */
@@ -1977,6 +2333,8 @@ body {
 .status-indicators {
     display: flex;
     gap: 15px;
+    flex-wrap: wrap;
+    align-items: center;
 }
 
 .status-item {
@@ -1987,6 +2345,8 @@ body {
     border-radius: 6px;
     font-size: 0.9rem;
     background: rgba(255, 255, 255, 0.1);
+    white-space: nowrap;
+    transition: all 0.2s ease;
 }
 
 .status-item.connected {
@@ -2049,6 +2409,32 @@ body {
     font-size: 0.5rem;
 }
 
+/* Desktop hover effects */
+@media (min-width: 769px) {
+    .status-item:hover {
+        background: rgba(255, 255, 255, 0.2);
+        transform: translateY(-1px);
+    }
+    
+    /* Desktop header optimizations */
+    .header-content {
+        padding: 0 15px;
+    }
+    
+    .user-info {
+        gap: 1rem;
+    }
+    
+    .voice-input-btn {
+        padding: 0.5rem 1rem;
+    }
+    
+    .logout-btn {
+        padding: 8px 16px;
+        font-size: 0.9rem;
+    }
+}
+
 /* Offline Indicator */
 .offline-indicator {
     position: fixed;
@@ -2075,6 +2461,7 @@ body {
     display: flex;
     align-items: center;
     gap: 15px;
+    flex-shrink: 0;
 }
 
 .logo i {
@@ -2087,6 +2474,20 @@ body {
     color: #1f2937;
     margin: 0;
     font-weight: 700;
+}
+
+@media (max-width: 768px) {
+    .logo h1 {
+        font-size: 1.5rem;
+    }
+    
+    .logo i {
+        font-size: 1.5rem;
+    }
+    
+    .logo {
+        gap: 10px;
+    }
 }
 
 /* Hidden Utility */
@@ -2198,7 +2599,7 @@ body {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem 1rem;
+    padding: 0.5rem 0.75rem;
     background: var(--primary-color);
     color: white;
     border: none;
@@ -2206,6 +2607,7 @@ body {
     cursor: pointer;
     font-size: 0.875rem;
     transition: all 0.2s;
+    white-space: nowrap;
 }
 
 .voice-input-btn:hover {
