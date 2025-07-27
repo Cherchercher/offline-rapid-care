@@ -42,6 +42,7 @@ ADMIN: Oversees all roles, can reassign, get status updates
 PHYSICIAN: Asks for latest triage status, updates injuries, requests transfer
 
 NURSE: Inputs vitals, logs treatment
+FIELD_AGENT, Paramedic, REUNIFICATION_COORDINATOR, Nurses, and family members of patients.
 
 PARAMEDIC / EMT: Reports patient conditions via voice (auto triaged by model)
 

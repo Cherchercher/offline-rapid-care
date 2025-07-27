@@ -174,6 +174,7 @@ class DatabaseManager:
                 contact_info TEXT,
                 reported_by TEXT NOT NULL,
                 status TEXT DEFAULT 'missing',
+                characteristics TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
                 sync_status TEXT DEFAULT 'synced',
@@ -320,6 +321,7 @@ class DatabaseManager:
                     contact_info TEXT,
                     reported_by VARCHAR(255) NOT NULL,
                     status VARCHAR(50) DEFAULT 'missing',
+                    characteristics JSONB,
                     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
                     updated_at TIMESTAMP WITH TIME ZONE NOT NULL
                 )
@@ -697,10 +699,13 @@ class DatabaseManager:
             conn = self.get_sqlite_connection()
             cursor = conn.cursor()
             
+            # Convert characteristics to JSON string for storage
+            characteristics_json = json.dumps(person_data.get('characteristics', {}))
+            
             cursor.execute("""
                 INSERT INTO missing_persons 
-                (id, name, age, description, image_path, contact_info, reported_by, status, created_at, updated_at, sync_status)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, name, age, description, image_path, contact_info, reported_by, status, characteristics, created_at, updated_at, sync_status)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (
                 person_id,
                 person_data.get('name', ''),
@@ -710,6 +715,7 @@ class DatabaseManager:
                 person_data.get('contact_info', ''),
                 person_data.get('reported_by', ''),
                 person_data.get('status', 'missing'),
+                characteristics_json,
                 timestamp,
                 timestamp,
                 'pending'
@@ -751,7 +757,23 @@ class DatabaseManager:
             columns = [description[0] for description in cursor.description]
             conn.close()
             
-            return [dict(zip(columns, row)) for row in rows]
+            # Convert rows to dictionaries and parse characteristics
+            result = []
+            for row in rows:
+                person_dict = dict(zip(columns, row))
+                
+                # Parse characteristics from JSON string
+                if person_dict.get('characteristics'):
+                    try:
+                        person_dict['characteristics'] = json.loads(person_dict['characteristics'])
+                    except (json.JSONDecodeError, TypeError):
+                        person_dict['characteristics'] = {}
+                else:
+                    person_dict['characteristics'] = {}
+                
+                result.append(person_dict)
+            
+            return result
             
         except Exception as e:
             logger.error(f"Error getting missing persons: {e}")
@@ -1085,6 +1107,35 @@ class DatabaseManager:
                         data['timestamp'],
                         data['created_at'],
                         data['created_by']
+                    ))
+                
+                elif table_name == 'missing_persons':
+                    conn.execute("""
+                        INSERT INTO missing_persons 
+                        (id, name, age, description, image_path, contact_info, reported_by, status, characteristics, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (id) DO UPDATE SET
+                        name = EXCLUDED.name,
+                        age = EXCLUDED.age,
+                        description = EXCLUDED.description,
+                        image_path = EXCLUDED.image_path,
+                        contact_info = EXCLUDED.contact_info,
+                        reported_by = EXCLUDED.reported_by,
+                        status = EXCLUDED.status,
+                        characteristics = EXCLUDED.characteristics,
+                        updated_at = EXCLUDED.updated_at
+                    """, (
+                        data['id'],
+                        data['name'],
+                        data['age'],
+                        data['description'],
+                        data['image_path'],
+                        data['contact_info'],
+                        data['reported_by'],
+                        data['status'],
+                        data.get('characteristics', {}),
+                        data['created_at'],
+                        data['updated_at']
                     ))
             
             conn.close()

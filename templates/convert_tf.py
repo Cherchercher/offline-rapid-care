@@ -20,7 +20,7 @@ model = AutoModelForCausalLM.from_pretrained(
     max_seq_length=128,         # Unsloth disables fused kernels if set low
 )
 
-tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+tokenizer = AutoTokenizer.frogitm_pretrained(MODEL_ID)
 
 # Dummy input for export
 inputs = tokenizer("Hello, how are you?", return_tensors="pt")
