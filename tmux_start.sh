@@ -60,7 +60,7 @@ cleanup_sessions() {
 check_local_model() {
     print_status "Checking local Gemma 3n model..."
     
-    local_model_path="./models/gemma3n-local"
+    local_model_path="./models/gemma3n-local-e2b"
     if [ -d "$local_model_path" ]; then
         print_success "Local Gemma 3n model found at $local_model_path"
         
@@ -146,7 +146,7 @@ show_management_info() {
     echo ""
     
     # Check local model
-    local_model_path="./models/gemma3n-local"
+    local_model_path="./models/gemma3n-local-e2b"
     if [ -d "$local_model_path" ]; then
         echo "✅ Local Gemma 3n Model: $local_model_path"
     else

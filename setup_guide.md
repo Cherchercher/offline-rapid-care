@@ -2,13 +2,13 @@
 
 ## 🚀 Quick Setup
 
-### Option 1: Ollama Mode (Recommended for Production)
+### Option 1: Direct Model Mode (Recommended for Production)
 ```bash
-# 1. Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
+# 1. Download the Gemma 3n model
+python3 scripts/download_gemma_models.py --model 2b
 
-# 2. Pull the base Gemma 3n model
-ollama pull gemma3n:e4b
+# 2. Test the model
+python3 scripts/dynamic_model_manager.py
 
 # 3. Run the startup script
 ./start.sh
@@ -67,22 +67,20 @@ models/fine-tuned/mci-triage-lora/
 └── special_tokens_map.json
 ```
 
-#### For Ollama (Custom Model):
+#### For Direct Model (Custom Model):
 ```bash
-# 1. Create a Modelfile for your fine-tuned model
-cat > Modelfile << EOF
-FROM gemma3n:e4b
-PARAMETER temperature 0.7
-PARAMETER top_p 0.9
-SYSTEM """You are a medical triage assistant trained for mass casualty incidents.
-Respond with concise, actionable information using medical triage categories."""
+# 1. Create a model configuration file
+cat > models/configs/triage_config.json << EOF
+{
+  "model_name": "gemma3n-2b",
+  "temperature": 0.7,
+  "top_p": 0.9,
+  "system_prompt": "You are a medical triage assistant trained for mass casualty incidents. Respond with concise, actionable information using medical triage categories."
+}
 EOF
 
-# 2. Build custom model
-ollama create mci-triage -f Modelfile
-
-# 3. Update app.py to use your custom model
-# Change GEMMA_MODEL = "mci-triage"
+# 2. Update app.py to use your custom configuration
+# Change MODEL_CONFIG = "models/configs/triage_config.json"
 ```
 
 ### 2. Environment Configuration
@@ -90,9 +88,8 @@ ollama create mci-triage -f Modelfile
 Create `.env` file:
 ```bash
 # Model Configuration
-MODEL_MODE=auto                    # auto, direct, or ollama
-OLLAMA_URL=http://localhost:11434
-GEMMA_MODEL=gemma3n:e4b           # or your custom model name
+MODEL_MODE=auto                    # auto, direct, or edge_ai
+GEMMA_MODEL=gemma3n-2b           # or your custom model name
 
 # Video Processing
 VIDEO_FRAME_INTERVAL=2
@@ -109,39 +106,36 @@ FLASK_PORT=5000
 SECRET_KEY=your-secret-key-here
 ```
 
-### 3. Ollama Setup (if using Ollama mode)
+### 3. Direct Model Setup (if using Direct mode)
 
-#### Install Ollama:
+#### Download Models:
 ```bash
-# macOS
-curl -fsSL https://ollama.ai/install.sh | sh
+# Download 2B model (for CPU environments)
+python3 scripts/download_gemma_models.py --model 2b
 
-# Linux
-curl -fsSL https://ollama.ai/install.sh | sh
+# Download 4B model (for GPU environments)
+python3 scripts/download_gemma_models.py --model 4b
 
-# Windows
-# Download from https://ollama.ai/download
+# Download both models
+python3 scripts/download_gemma_models.py --model both
 ```
 
 #### Verify Installation:
 ```bash
-# Check Ollama version
-ollama --version
+# Test model loading
+python3 scripts/dynamic_model_manager.py
 
-# List available models
-ollama list
-
-# Test model
-ollama run gemma3n:e4b "Hello, test message"
+# Test model availability
+python3 scripts/setup_model_directories.py
 ```
 
-#### Pull Required Models:
+#### Model Configuration:
 ```bash
-# Pull base model
-ollama pull gemma3n:e4b
+# Setup model directories
+python3 scripts/setup_model_directories.py
 
-# If you have a custom fine-tuned model:
-# ollama pull your-custom-model-name
+# Test model selection
+python3 scripts/dynamic_model_manager.py
 ```
 
 ### 4. Python Dependencies
@@ -218,9 +212,9 @@ print('Model loaded successfully')
 "
 ```
 
-### 2. Test Ollama Connection:
+### 2. Test Model Connection:
 ```bash
-curl http://localhost:11434/api/tags
+curl http://localhost:5001/chat
 ```
 
 ### 3. Test Video Processing:
@@ -250,16 +244,17 @@ nvidia-smi
 export CUDA_VISIBLE_DEVICES=""
 ```
 
-#### 2. Ollama Connection Issues:
+#### 2. Model Connection Issues:
 ```bash
-# Check if Ollama is running
-ps aux | grep ollama
+# Check if model server is running
+ps aux | grep model_server
 
-# Restart Ollama
-sudo systemctl restart ollama
+# Restart model server
+pkill -f model_server
+python3 model_server.py &
 
 # Check logs
-journalctl -u ollama -f
+tail -f model_server.log
 ```
 
 #### 3. Video Processing Issues:
@@ -328,8 +323,7 @@ CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:app"]
 
 ### 3. Environment Variables:
 ```bash
-export MODEL_MODE=ollama
-export OLLAMA_URL=http://your-ollama-server:11434
+export MODEL_MODE=direct
 export FLASK_ENV=production
 ```
 

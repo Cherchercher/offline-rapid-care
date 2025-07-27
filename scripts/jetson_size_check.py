@@ -10,7 +10,7 @@ from pathlib import Path
 def analyze_model_size():
     """Analyze the current model size and estimate quantization results"""
     
-    model_path = "./models/gemma3n-local"
+    model_path = "./models/gemma3n-local-e2b"
     
     if not os.path.exists(model_path):
         print("❌ Model not found. Please run download_gemma_local.py first.")
@@ -122,7 +122,7 @@ import time
 import os
 
 class JetsonGemmaRunner:
-    def __init__(self, model_path="./models/gemma3n-local"):
+    def __init__(self, model_path="./models/gemma3n-local-e2b"):
         self.model_path = model_path
         self.processor = None
         self.model = None

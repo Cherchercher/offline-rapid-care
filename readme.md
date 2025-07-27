@@ -48,22 +48,22 @@ RapidCare is designed to compete for multiple prizes by showcasing different asp
 ### **The Jetson Prize**
 For the best demonstration of on-device power by deploying a Gemma 3n product on an NVIDIA Jetson device.
 
-**Our Approach**: RapidCare runs fully offline on Jetson devices, processing all critical tasks locally including video analysis, voice transcription, and patient triage. When internet connectivity is lost, data is stored locally and synced when connectivity returns.
+**Our Approach**: RapidCare runs fully offline on Jetson devices with intelligent dual-model support (2B and 4B), automatically selecting the optimal model based on system load. This ensures maximum performance while maintaining reliability during critical emergency response scenarios. When internet connectivity is lost, data is stored locally and synced when connectivity returns.
 
 ### **The Google AI Edge Prize**
 For the most compelling and effective use case built using the Google AI Edge implementation of Gemma 3n.
 
-**Our Approach**: We leverage Google Edge AI for optimized inference and device interoperability, ensuring seamless operation across different edge devices while maintaining performance.
+**Our Approach**: We leverage Google Edge AI with dynamic model selection, automatically choosing between 2B and 4B models based on system load and task complexity. This ensures optimal performance across different edge devices while maintaining reliability during critical emergency response scenarios.
 
-### **The Ollama Prize**
-For the best project that utilizes and showcases the capabilities of Gemma 3n running locally via Ollama.
+### **The Local AI Prize**
+For the best project that utilizes and showcases the capabilities of Gemma 3n running locally via direct model inference.
 
-**Our Approach**: Our local-first architecture uses Ollama to run Gemma 3n models locally, ensuring zero-latency responses even without internet connectivity.
+**Our Approach**: Our local-first architecture uses intelligent model selection to run both Gemma 3n 2B and 4B models locally, automatically choosing the optimal model based on system load and task requirements. This demonstrates real-world production scenarios where organizations must balance performance with resource constraints, ensuring reliable operation across diverse hardware environments.
 
 ### **The Unsloth Prize**
 For the best fine-tuned Gemma 3n model created using Unsloth, optimized for a specific, impactful task.
 
-**Our Approach**: We fine-tune Gemma 3n specifically for mass casualty incident response, optimizing for medical triage, patient reunification, and emergency coordination tasks.
+**Our Approach**: We fine-tune both Gemma 3n 2B and 4B models specifically for mass casualty incident response, optimizing for medical triage, patient reunification, and emergency coordination tasks across different deployment scenarios.
 
 ## 🧠 Technical Architecture
 
@@ -71,12 +71,34 @@ For the best fine-tuned Gemma 3n model created using Unsloth, optimized for a sp
 
 | Technology | Role in RapidCare |
 |------------|-------------------|
-| **Gemma 3n** | Foundation model fine-tuned for MCI-specific workflows |
+| **Gemma 3n 2B** | CPU-optimized model for local hosting (AWS, etc.) |
+| **Gemma 3n 4B** | GPU-optimized model for Google Edge AI and Jetson devices |
 | **Google Edge AI** | Edge-optimized model inference and device interoperability |
 | **Jetson Device** | On-device processing and local data storage |
 | **Progressive Web App** | Cross-platform deployment (Web, Android, iOS) |
 | **Voice-to-Text** | Local speech recognition for hands-free operation |
 | **HTTP Bridge** | Communication between PWA and on-device AI |
+
+### **Dynamic Model Deployment Strategy**
+
+Our architecture supports intelligent model selection based on system load and available hardware:
+
+#### **Smart Model Selection**
+- **High Load Detection**: Automatically switches to 2B model when system resources are constrained
+- **Load Monitoring**: Real-time CPU, memory, GPU, and temperature monitoring
+- **Task-Aware Selection**: Quick tasks (voice transcription) use 2B, complex tasks (video analysis) use 4B when resources allow
+
+#### **Hardware-Based Deployment**
+- **CPU-Only Environments** (AWS EC2, local servers): Gemma 3n 2B model for efficient CPU inference
+- **GPU-Enabled Edge Devices** (Google Edge AI, Jetson): Gemma 3n 4B model for enhanced performance
+- **Mixed Environments**: Dynamic switching between 2B and 4B based on current system load
+
+#### **Load-Based Optimization**
+- **High Load Conditions** (>80% CPU, >85% memory, >90% GPU): Automatically selects 2B model
+- **Moderate Load** (60-80% CPU, 70-85% memory): Uses 2B for quick tasks, 4B for complex tasks
+- **Low Load** (<60% CPU, <70% memory): Leverages 4B model for maximum performance
+
+This approach demonstrates real-world production scenarios where organizations must balance performance with resource constraints, automatically optimizing for the best possible response quality given current system conditions.
 
 ### **Offline-First Design**
 
@@ -85,6 +107,64 @@ RapidCare operates in three connectivity modes:
 1. **Online Mode**: Full cloud sync and real-time collaboration
 2. **Offline Mode**: Local processing with data caching
 3. **Hybrid Mode**: Selective sync when connectivity is intermittent
+
+### **Real-Time System Monitoring**
+
+#### **Load Status Indicators**
+- **Low Load** (🟢): System operating optimally, using 4B model for maximum performance
+- **Moderate Load** (🟡): System under moderate stress, task-aware model selection
+- **High Load** (🔴): System under high stress, automatically switched to 2B model
+
+#### **UI Monitoring Features**
+- **Live Load Display**: Real-time CPU, memory, and GPU utilization
+- **Model Status**: Shows which model is currently active (2B or 4B)
+- **System Messages**: Automatic notifications when load changes significantly
+- **Performance Metrics**: Temperature, concurrent requests, and memory availability
+
+#### **Smart Alerts**
+- **Load Transitions**: Notifies users when switching between models
+- **Resource Warnings**: Alerts when system resources are constrained
+- **Performance Optimization**: Suggests actions to improve system performance
+
+## 🚀 Jetson-Specific Features
+
+### **Dual Model Support on Jetson Xavier NX**
+- **8GB RAM Capacity**: Can store both 2B (~4GB) and 4B (~8GB) models
+- **Smart Model Selection**: Automatically chooses optimal model based on current load
+- **Memory Management**: Only loads one model at a time to maximize available memory
+- **Performance Optimization**: 4B model for complex tasks, 2B for quick responses under load
+
+### **Offline Processing Capabilities**
+- **Local Data Storage**: Audio, image, and video files stored locally when offline
+- **Background Processing**: Processes stored data when system resources allow
+- **Cloud Synchronization**: Syncs processed results when connectivity returns
+- **Device Capability Detection**: Automatically determines if offline processing is supported
+
+### **System Load Intelligence**
+- **Multi-Metric Monitoring**: CPU, memory, GPU, temperature, and concurrent requests
+- **Predictive Switching**: Anticipates load changes and switches models proactively
+- **Resource Optimization**: Ensures critical tasks always have sufficient resources
+- **Performance Tracking**: Historical load data for system optimization
+
+## 🎯 Benefits of Dynamic Model Selection
+
+### **Production-Ready Flexibility**
+- **Resource Optimization**: Automatically adapts to available system resources
+- **Performance Guarantees**: Ensures critical tasks always complete, even under load
+- **Cost Efficiency**: Uses smaller models when possible, larger models when beneficial
+- **Scalability**: Works across different hardware configurations without manual tuning
+
+### **Real-World Deployment Scenarios**
+- **Emergency Response**: Critical situations where response time is paramount
+- **Resource-Constrained Environments**: Rural areas or temporary setups with limited hardware
+- **High-Traffic Situations**: Mass casualty events with multiple concurrent users
+- **Variable Load Conditions**: Systems that experience fluctuating resource demands
+
+### **Technical Advantages**
+- **Zero Downtime**: Model switching happens seamlessly without service interruption
+- **Predictive Intelligence**: Anticipates load changes before they impact performance
+- **Task Optimization**: Matches model complexity to task requirements
+- **Memory Efficiency**: Only loads the model currently needed
 
 ## 🎥 Demo Scenarios
 
@@ -148,6 +228,8 @@ The application includes robust internet connectivity detection with:
 - Graceful degradation when offline
 
 ### **AI Model Integration**
+- **Gemma 3n 2B**: CPU-optimized model for AWS/local hosting scenarios
+- **Gemma 3n 4B**: GPU-optimized model for Google Edge AI and Jetson devices
 - **Google Edge AI**: Optimized inference for edge devices
 - **Jetson AI**: Local processing and data storage
 - **Voice Recognition**: Browser-based speech-to-text

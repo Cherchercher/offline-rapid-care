@@ -84,7 +84,7 @@ python3 quantize_model.py
 from jetson_gemma_runner import JetsonGemmaRunner
 
 # Initialize runner
-runner = JetsonGemmaRunner("./models/gemma3n-local-4bit")
+runner = JetsonGemmaRunner("./models/gemma3n-local-e4b")
 
 # Transcribe audio file
 result = runner.transcribe_audio("sample.wav")
@@ -94,7 +94,7 @@ print(f"Transcription: {result}")
 ### 2. Web Interface
 ```bash
 # Run the Flask app with quantized model
-python3 app.py --model-path ./models/gemma3n-local-4bit
+python3 app.py --model-path ./models/gemma3n-local-e4b
 ```
 
 ## Optimization Tips

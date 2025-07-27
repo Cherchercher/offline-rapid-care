@@ -484,8 +484,8 @@ def transcribe_voice():
             audio_path = tmp_file.name
         
         try:
-            # Use Ollama for transcription
-            transcription = transcribe_audio_with_ollama(audio_path, user_role)
+            # Use direct model for transcription
+            transcription = transcribe_audio_with_direct_model(audio_path, user_role)
             
             return jsonify({
                 'success': True,
@@ -1172,7 +1172,7 @@ def transcribe_text():
         if not transcription:
             return jsonify({'error': 'No transcription provided'}), 400
         
-        # Use Ollama to enhance/process the transcription with triage requirements
+        # Use direct model to enhance/process the transcription with triage requirements
         system_prompt = TRANSCRIBE_TEXT_SYSTEM_PROMPT_TEMPLATE.format(role=user_role.lower())
         
         messages = [
@@ -1194,7 +1194,7 @@ def transcribe_text():
             return jsonify({
                 'success': True,
                 'transcription': transcription,
-                'enhanced_response': transcription,  # Use raw transcription if Ollama fails
+                'enhanced_response': transcription,  # Use raw transcription if model fails
                 'auto_send': True,
                 'timestamp': datetime.now().isoformat()
             })
@@ -1385,8 +1385,8 @@ def combine_analysis_results(results, user_role):
     
     return combined
 
-def transcribe_audio_with_ollama(audio_path, user_role):
-    """Transcribe audio using speech recognition and enhance with Ollama"""
+def transcribe_audio_with_direct_model(audio_path, user_role):
+    """Transcribe audio using speech recognition and enhance with direct model"""
     try:
         import speech_recognition as sr
         from pydub import AudioSegment
@@ -1432,7 +1432,7 @@ def transcribe_audio_with_ollama(audio_path, user_role):
         except:
             pass
         
-        # Use Ollama to enhance/process the transcription
+        # Use direct model to enhance/process the transcription
         system_prompt = AUDIO_ENHANCEMENT_PROMPT_TEMPLATE.format(role=user_role.lower())
         
         messages = [
@@ -1445,7 +1445,7 @@ def transcribe_audio_with_ollama(audio_path, user_role):
         if result['success']:
             return result['response']
         else:
-            return transcription  # Return raw transcription if Ollama fails
+            return transcription  # Return raw transcription if model fails
             
     except ImportError:
         # Fallback if speech recognition libraries aren't available
@@ -1671,6 +1671,78 @@ def get_device_capabilities():
             'error': str(e)
         }), 500
 
+@app.route('/api/system/load', methods=['GET'])
+def get_system_load():
+    """Get current system load status"""
+    try:
+        import psutil
+        import subprocess
+        
+        # Get CPU and memory metrics
+        cpu_percent = psutil.cpu_percent(interval=1)
+        memory = psutil.virtual_memory()
+        memory_percent = memory.percent
+        memory_available_gb = memory.available / (1024**3)
+        
+        # Get GPU metrics if available
+        gpu_memory_used_mb = 0
+        gpu_memory_total_mb = 0
+        gpu_utilization = 0
+        temperature = None
+        
+        try:
+            result = subprocess.run(['nvidia-smi', '--query-gpu=memory.used,memory.total,utilization.gpu,temperature.gpu', '--format=csv,noheader,nounits'], 
+                                  capture_output=True, text=True)
+            
+            if result.returncode == 0:
+                lines = result.stdout.strip().split('\n')
+                for line in lines:
+                    if line.strip():
+                        parts = line.split(', ')
+                        if len(parts) >= 4:
+                            gpu_memory_used_mb = float(parts[0])
+                            gpu_memory_total_mb = float(parts[1])
+                            gpu_utilization = float(parts[2])
+                            temperature = float(parts[3])
+        except:
+            pass
+        
+        # Count concurrent requests (simplified)
+        concurrent_requests = len([p for p in psutil.process_iter(['pid', 'name']) 
+                                 if 'python' in p.info['name'].lower() and 'app.py' in ' '.join(p.cmdline())])
+        
+        # Determine if system is under high load
+        is_high_load = (
+            cpu_percent > 80.0 or
+            memory_percent > 85.0 or
+            memory_available_gb < 2.0 or
+            (gpu_memory_total_mb > 0 and (gpu_memory_used_mb / gpu_memory_total_mb * 100) > 90.0) or
+            (temperature and temperature > 75.0) or
+            concurrent_requests > 3
+        )
+        
+        load_data = {
+            'cpu_percent': cpu_percent,
+            'memory_percent': memory_percent,
+            'memory_available_gb': memory_available_gb,
+            'gpu_memory_used_mb': gpu_memory_used_mb,
+            'gpu_memory_total_mb': gpu_memory_total_mb,
+            'gpu_utilization': gpu_utilization,
+            'temperature': temperature,
+            'concurrent_requests': concurrent_requests,
+            'is_high_load': is_high_load
+        }
+        
+        return jsonify({
+            'success': True,
+            'load': load_data
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 @app.route('/api/connectivity', methods=['GET'])
 def check_connectivity():
     """Check internet connectivity status"""
@@ -1795,13 +1867,13 @@ def get_config():
 
 @app.route('/api/model/switch', methods=['POST'])
 def switch_model_mode():
-    """Switch between direct and Ollama modes"""
+    """Switch between direct and Edge AI modes"""
     try:
         data = request.json
         new_mode = data.get('mode', 'auto')
         
-        if new_mode not in ['direct', 'ollama', 'auto', 'edge_ai']:
-            return jsonify({'error': 'Invalid mode. Use: direct, ollama, edge_ai, or auto'}), 400
+        if new_mode not in ['direct', 'auto', 'edge_ai']:
+            return jsonify({'error': 'Invalid mode. Use: direct, edge_ai, or auto'}), 400
         
         # Switch mode
         model_manager.switch_mode(new_mode)

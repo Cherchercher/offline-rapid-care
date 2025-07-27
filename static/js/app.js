@@ -43,8 +43,14 @@ class RapidCareApp {
         // Start offline storage status polling
         setInterval(() => this.checkOfflineStorageStatus(), 60000);
         
+        // Start system load status polling
+        setInterval(() => this.checkSystemLoadStatus(), 30000);
+        
         // Check device capabilities on startup
         this.checkDeviceCapabilities();
+        
+        // Add initial system message explaining status indicators
+        this.addSystemMessage('System status indicators: Storage (offline file processing), Load (system resource usage), Jetson (device capabilities). These features work best on Jetson devices with offline processing support.');
         
         // Add online/offline event listeners
         window.addEventListener('online', () => this.handleOnline());
@@ -2412,6 +2418,12 @@ class RapidCareApp {
             }
         } catch (error) {
             console.log('Offline storage status check failed:', error);
+            // Show fallback message for offline storage
+            const offlineStorageStatus = document.getElementById('offline-storage-status');
+            if (offlineStorageStatus) {
+                offlineStorageStatus.innerHTML = `<i class="fas fa-database"></i> N/A`;
+                offlineStorageStatus.className = 'status-item disconnected';
+            }
         }
     }
     
@@ -2468,6 +2480,47 @@ class RapidCareApp {
             }
         } catch (error) {
             console.log('Device capabilities check failed:', error);
+        }
+    }
+
+    async checkSystemLoadStatus() {
+        try {
+            const response = await fetch('/api/system/load');
+            const data = await response.json();
+            if (data.success) {
+                const load = data.load;
+                const systemLoadStatus = document.getElementById('system-load-status');
+                
+                if (systemLoadStatus) {
+                    if (load.is_high_load) {
+                        systemLoadStatus.innerHTML = `<i class="fas fa-exclamation-triangle"></i> High Load`;
+                        systemLoadStatus.className = 'status-item warning';
+                    } else if (load.cpu_percent > 60 || load.memory_percent > 70) {
+                        systemLoadStatus.innerHTML = `<i class="fas fa-chart-line"></i> Moderate`;
+                        systemLoadStatus.className = 'status-item connected';
+                    } else {
+                        systemLoadStatus.innerHTML = `<i class="fas fa-check-circle"></i> Low Load`;
+                        systemLoadStatus.className = 'status-item connected';
+                    }
+                }
+                
+                // Show system message if load changes significantly
+                if (load.is_high_load && !this.highLoadShown) {
+                    this.addSystemMessage('⚠️ High system load detected. Using optimized model for better performance.');
+                    this.highLoadShown = true;
+                } else if (!load.is_high_load && this.highLoadShown) {
+                    this.addSystemMessage('✅ System load normalized. Full model performance restored.');
+                    this.highLoadShown = false;
+                }
+            }
+        } catch (error) {
+            console.log('System load status check failed:', error);
+            // Show fallback message for system load
+            const systemLoadStatus = document.getElementById('system-load-status');
+            if (systemLoadStatus) {
+                systemLoadStatus.innerHTML = `<i class="fas fa-info-circle"></i> N/A`;
+                systemLoadStatus.className = 'status-item disconnected';
+            }
         }
     }
 
@@ -3194,7 +3247,7 @@ initializeModelManagerWithMode();
 function getBackendMode() {
     const mode = getAIMode();
     if (mode === 'edge') return 'edge_ai';
-    if (mode === 'cloud') return 'ollama'; // or 'direct' if you want local
+            if (mode === 'cloud') return 'direct'; // Use direct model for local processing
     return mode;
 }
 

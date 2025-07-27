@@ -159,9 +159,10 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# Ollama models and data
-.ollama/
-ollama_models/
+# Model data
+models/
+*.bin
+*.safetensors
 
 # Backup files
 *.bak

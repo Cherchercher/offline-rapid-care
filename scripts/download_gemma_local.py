@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Download Gemma 3n model locally for use with Ollama or direct inference
+Download Gemma 3n model locally for direct inference
 """
 
 import os
@@ -12,7 +12,7 @@ def download_gemma_local():
     """Download Gemma 3n model locally"""
     
     model_id = "google/gemma-3n-E2B-it"
-    local_dir = "./models/gemma3n-local"
+    local_dir = "./models/gemma3n-local-e2b"
     
     print(f"📥 Downloading {model_id} to {local_dir}...")
     
@@ -49,27 +49,27 @@ def download_gemma_local():
         print(f"❌ Error downloading model: {e}")
         return None
 
-def create_ollama_modelfile(local_path):
-    """Create a Modelfile for Ollama using local model"""
+def create_model_config(local_path):
+    """Create a model configuration file"""
     
-    modelfile_content = f"""FROM {local_path}
+    config_content = f"""# Model Configuration
+model_path: {local_path}
+model_type: gemma3n
+temperature: 0.1
+top_p: 0.9
+top_k: 40
+max_length: 32768
+repeat_penalty: 1.1
 
-# This model has full audio, image, and video capabilities
-SYSTEM "You are an AI assistant with comprehensive multimodal capabilities. You can process and transcribe audio files accurately. You can analyze images and videos. You can handle text, audio, image, and video inputs. When given audio files, transcribe them completely and accurately."
-
-# Set parameters optimized for audio processing
-PARAMETER temperature 0.1
-PARAMETER top_p 0.9
-PARAMETER top_k 40
-PARAMETER num_ctx 32768
-PARAMETER repeat_penalty 1.1
+# System prompt for medical triage
+system_prompt: "You are a medical triage assistant trained for mass casualty incidents. You can process and transcribe audio files accurately. You can analyze images and videos for medical assessment. You can handle text, audio, image, and video inputs. When given audio files, transcribe them completely and accurately. When analyzing medical images or videos, provide triage assessments."
 """
     
-    with open("Modelfile.local", "w") as f:
-        f.write(modelfile_content)
+    with open("model_config.yaml", "w") as f:
+        f.write(config_content)
     
-    print("📝 Created Modelfile.local for Ollama")
-    return "Modelfile.local"
+    print("📝 Created model_config.yaml")
+    return "model_config.yaml"
 
 if __name__ == "__main__":
     print("🚀 Setting up local Gemma 3n model...")
@@ -78,18 +78,18 @@ if __name__ == "__main__":
     local_path = download_gemma_local()
     
     if local_path:
-        # Create Ollama Modelfile
-        modelfile = create_ollama_modelfile(local_path)
+        # Create model configuration
+        config = create_model_config(local_path)
         
         print("\n📋 Next steps:")
-        print("1. Build Ollama model:")
-        print(f"   ollama create gemma3n-local -f {modelfile}")
-        print("2. Update your app to use 'gemma3n-local'")
-        print("3. Or use the model directly in Python for full audio support")
+        print("1. Model downloaded successfully!")
+        print(f"2. Configuration saved to: {config}")
+        print("3. Use the model directly in Python for full capabilities")
         
-        print("\n🎯 For direct Python usage (recommended for audio):")
-        print("   from transformers import AutoProcessor, Gemma3nForConditionalGeneration")
-        print(f"   model = Gemma3nForConditionalGeneration.from_pretrained('{local_path}')")
-        print("   processor = AutoProcessor.from_pretrained('{local_path}')")
+        print("\n🎯 For direct Python usage:")
+        print("   from transformers import AutoProcessor, AutoModelForImageTextToText")
+        print(f"   model = AutoModelForImageTextToText.from_pretrained('{local_path}')")
+        print(f"   processor = AutoProcessor.from_pretrained('{local_path}')")
+        print("\n💡 This model supports audio, image, and video processing")
     else:
         print("❌ Failed to download model") 

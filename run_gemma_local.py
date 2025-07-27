@@ -10,7 +10,7 @@ import requests
 from pathlib import Path
 
 # Use local model path
-LOCAL_MODEL_PATH = "./models/gemma3n-local"
+LOCAL_MODEL_PATH = "./models/gemma3n-local-e2b"
 
 def download_audio_file(url, local_path):
     """Download audio file from URL to local path"""

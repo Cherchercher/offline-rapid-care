@@ -1,6 +1,6 @@
 # RapidCare - AI-Powered Mass Casualty Incident Response System
 
-A Progressive Web App (PWA) that leverages on-device AI models via Ollama for emergency response coordination during mass casualty incidents.
+A Progressive Web App (PWA) that leverages on-device AI models via direct model inference for emergency response coordination during mass casualty incidents.
 
 ## 🚀 Features
 
@@ -10,7 +10,7 @@ A Progressive Web App (PWA) that leverages on-device AI models via Ollama for em
 - **Role-Based Interface**: Different views for various emergency roles
 - **Voice Input**: Speech-to-text capabilities for hands-free operation
 - **Patient Management**: Triage categorization and tracking
-- **Real-time Status**: Live connection monitoring with Ollama
+- **Real-time Status**: Live connection monitoring with AI models
 
 ### Emergency Response Roles
 - **PARAMEDIC/EMT**: Field triage and patient assessment
@@ -40,7 +40,7 @@ A Progressive Web App (PWA) that leverages on-device AI models via Ollama for em
 
 ### Backend
 - **Flask**: Python web framework
-- **Ollama**: Local AI model hosting
+- **Direct Model Inference**: Local AI model hosting
 - **Gemma 3n**: On-device language model
 - **RESTful APIs**: JSON-based communication
 
@@ -54,13 +54,12 @@ A Progressive Web App (PWA) that leverages on-device AI models via Ollama for em
 ### System Requirements
 - Python 3.8+
 - Node.js 16+ (for development tools)
-- 8GB+ RAM (for Ollama model)
+- 8GB+ RAM (for AI model)
 - Modern web browser with PWA support
 
 ### Required Software
-1. **Ollama**: [Install Ollama](https://ollama.ai/download)
-2. **Python Dependencies**: See `requirements.txt`
-3. **Gemma 3n Model**: `ollama pull gemma3n:e4b`
+1. **Python Dependencies**: See `requirements.txt`
+2. **Gemma 3n Model**: Download via `scripts/download_gemma_models.py`
 
 ## 🚀 Quick Start
 
@@ -68,18 +67,15 @@ A Progressive Web App (PWA) that leverages on-device AI models via Ollama for em
 ```bash
 # Install Python dependencies
 pip install -r requirements.txt
-
-# Install Ollama (if not already installed)
-curl -fsSL https://ollama.ai/install.sh | sh
 ```
 
 ### 2. Download AI Model
 ```bash
-# Pull the Gemma 3n model
-ollama pull gemma3n:e4b
+# Download the Gemma 3n model
+python3 scripts/download_gemma_models.py --model 2b
 
 # Verify installation
-ollama list
+python3 scripts/dynamic_model_manager.py
 ```
 
 ### 3. Generate Icons
@@ -93,9 +89,6 @@ python generate_icons.py
 
 ### 4. Start the Application
 ```bash
-# Start Ollama (in background)
-ollama serve &
-
 # Start the Flask application
 python app.py
 ```
@@ -134,8 +127,8 @@ python app.py
 
 ### Environment Variables
 ```bash
-# Optional: Customize Ollama endpoint
-export OLLAMA_BASE_URL="http://localhost:11434"
+# Optional: Customize model endpoint
+export MODEL_BASE_URL="http://localhost:5001"
 
 # Optional: Customize model name
 export GEMMA_MODEL="gemma3n:e4b"
@@ -167,7 +160,7 @@ export GEMMA_MODEL="gemma3n:e4b"
 ## 🔒 Security Considerations
 
 ### Data Privacy
-- All data processed locally via Ollama
+- All data processed locally via direct model inference
 - No cloud dependencies for core functionality
 - Patient data stored in browser IndexedDB
 - Optional encryption for sensitive data
@@ -181,8 +174,8 @@ export GEMMA_MODEL="gemma3n:e4b"
 
 ### Manual Testing
 ```bash
-# Test Ollama connection
-curl http://localhost:11434/api/tags
+# Test model connection
+curl http://localhost:5001/chat
 
 # Test Flask API
 curl http://localhost:5000/api/status
@@ -252,7 +245,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## 🙏 Acknowledgments
 
 - **Google**: For the Gemma 3n model
-- **Ollama**: For local model hosting
+- **Direct Model Inference**: For local model hosting
 - **Flask**: For the web framework
 - **Emergency Responders**: For domain expertise and feedback
 

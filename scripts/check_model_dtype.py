@@ -10,7 +10,7 @@ import os
 def check_model_info():
     """Check the current model's dtype and size"""
     
-    local_model_path = "./models/gemma3n-local"
+    local_model_path = "./models/gemma3n-local-e2b"
     
     print("📊 Checking current model information...")
     

@@ -107,24 +107,54 @@ pip3 install psutil  # For memory monitoring
 pip3 install requests  # For HTTP requests
 ```
 
-### **3.3 Download Gemma 3n Model**
+### **3.3 Download Gemma 3n Models**
 ```bash
 # Create models directory
-mkdir -p models/gemma3n-local
+mkdir -p models/
 
-# Download the Gemma 3n model
-# Option 1: Download from Hugging Face (requires internet)
-python3 scripts/download_gemma_local.py
+# Download both 2B and 4B models (recommended for Jetson Xavier NX)
+python3 scripts/download_gemma_models.py --model both --check-space
+
+# Or download individual models:
+# python3 scripts/download_gemma_models.py --model 2b  # For CPU environments
+# python3 scripts/download_gemma_models.py --model 4b  # For GPU environments
 
 # Option 2: Copy model files from another device
-# scp -r user@source-device:/path/to/gemma3n-local models/
+# scp -r user@source-device:/path/to/gemma3n-2b models/
+# scp -r user@source-device:/path/to/gemma3n-4b models/
 ```
 
 ---
 
 ## **Phase 4: Model Optimization for Jetson**
 
-### **4.1 Optimize Model for Jetson**
+### **4.1 Configure Model Paths**
+```bash
+# Set up model directory structure
+mkdir -p models/gemma3n-2b models/gemma3n-4b
+
+# Option 1: Use Dynamic Model Manager (Recommended)
+# The dynamic model manager automatically selects the best model based on:
+# - System load (CPU, memory, GPU usage)
+# - Device capabilities (Jetson vs Desktop)
+# - Task type (quick vs complex analysis)
+
+# Setup model directories (renames existing gemma3n-local to gemma3n-2b)
+python3 scripts/setup_model_directories.py
+
+# Test dynamic model selection
+python3 scripts/dynamic_model_manager.py
+
+# Option 2: Manual Configuration
+# Edit model_manager_pipeline.py to use specific model:
+# - Default: ./models/gemma3n-2b (for web/CPU environments)
+# - Jetson: ./models/gemma3n-4b (for GPU environments)
+
+# Test model loading
+python3 scripts/test_setup.py
+```
+
+### **4.2 Optimize Models for Jetson**
 ```bash
 # Run model optimization scripts
 python3 scripts/check_model_dtype.py
@@ -132,6 +162,56 @@ python3 scripts/reduce_model_size.py
 
 # For aggressive optimization (if needed)
 python3 scripts/aggressive_reduction.py
+```
+
+### **4.3 Integrate Dynamic Model Manager**
+```bash
+# Update your main application to use dynamic model selection
+# In model_manager_pipeline.py, replace the static model path with:
+
+from scripts.dynamic_model_manager import DynamicModelManager
+
+class ModelManagerPipeline:
+    def __init__(self):
+        self.dynamic_manager = DynamicModelManager()
+        self.model = None
+        self.processor = None
+    
+    def load_model(self, task_type='general'):
+        """Load the optimal model for the current task and system load"""
+        self.model, self.processor = self.dynamic_manager.load_model()
+        return self.model, self.processor
+    
+    def select_model_for_task(self, task_type):
+        """Select the best model for a specific task"""
+        return self.dynamic_manager.select_optimal_model(task_type)
+```
+
+### **4.4 Model Directory Configuration Options**
+
+#### **Option A: Dynamic Selection (Recommended)**
+```bash
+# Models are automatically selected based on system load
+./models/gemma3n-2b/  # Used for high load, quick tasks
+./models/gemma3n-4b/  # Used for low load, complex tasks
+```
+
+#### **Option B: Static Configuration**
+```bash
+# For Web/CPU environments (default)
+./models/gemma3n-local-e2b/  # Rename to gemma3n-2b for consistency
+
+# For Jetson/GPU environments
+./models/gemma3n-local-e4b/     # Use 4B model for better performance
+```
+
+#### **Option C: Environment-Specific**
+```bash
+# Set environment variable to override default
+export RAPIDCARE_MODEL_PATH="./models/gemma3n-4b"
+
+# Or use command line argument
+python3 app.py --model-path ./models/gemma3n-4b
 ```
 
 ### **4.2 Test Model Loading**
@@ -329,8 +409,8 @@ python3 -c "from offline_storage_manager import offline_storage; print(offline_s
 2. **Model Loading Fails**
    ```bash
    # Check model files
-   ls -la models/gemma3n-local/
-   
+   ls -la models/gemma3n-local-e4b/
+   ls -la models/gemma3n-local-e2b/
    # Re-download model
    python3 scripts/download_gemma_local.py
    ```

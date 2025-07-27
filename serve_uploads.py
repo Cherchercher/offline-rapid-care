@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Simple HTTP server to serve uploads directory for Ollama access
-This runs on port 11435 so Ollama can access files via http://localhost:11435/
+Simple HTTP server to serve uploads directory for model access
+This runs on port 11435 so models can access files via http://localhost:11435/
 """
 
 import http.server

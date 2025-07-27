@@ -14,7 +14,7 @@ from prompts import MEDICAL_TRIAGE_PROMPT
 class ModelManagerPipeline:
     """Model manager using direct model loading for all tasks"""
     
-    def __init__(self, model_path: str = "./models/gemma3n-local", device: str = None):
+    def __init__(self, model_path: str = "./models/gemma3n-local-e2b", device: str = None):
         """
         Initialize direct model manager
         
@@ -55,7 +55,7 @@ class ModelManagerPipeline:
         
         try:
             # Use local model path
-            local_model_path = "./models/gemma3n-local"
+            local_model_path = self.model_path
             
             # Check if local model exists
             if not os.path.exists(local_model_path):
@@ -183,7 +183,7 @@ class ModelManagerPipeline:
                 'success': True,
                 'response': model_response,
                 'mode': 'text-direct',
-                'model': 'gemma3n-local',
+                'model': 'gemma3n-local-e2b',
                 'inference_time': inference_time
             }
             
@@ -298,7 +298,7 @@ class ModelManagerPipeline:
                 'success': True,
                 'response': model_response,
                 'mode': 'image-direct',
-                'model': 'gemma3n-local',
+                'model': 'gemma3n-local-e2b',
                 'inference_time': inference_time
             }
             

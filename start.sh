@@ -58,45 +58,14 @@ check_python() {
     print_success "Python found: $($PYTHON_CMD --version)"
 }
 
-# Check if Ollama is installed
-check_ollama() {
-    print_status "Checking Ollama installation..."
-    if ! command -v ollama &> /dev/null; then
-        print_warning "Ollama not found. Installing Ollama..."
-        if [[ "$OS" == "macos" ]]; then
-            # Check if Homebrew is available
-            if command -v brew &> /dev/null; then
-                print_status "Installing Ollama via Homebrew..."
-                brew install ollama
-            else
-                print_error "Homebrew not found. Please install Ollama manually:"
-                print_error "1. Visit https://ollama.ai/download"
-                print_error "2. Download and install the macOS version"
-                print_error "3. Or install Homebrew and run: brew install ollama"
-                exit 1
-            fi
-        else
-            # Linux installation
-            curl -fsSL https://ollama.ai/install.sh | sh
-        fi
-        print_success "Ollama installed successfully"
-    else
-        print_success "Ollama found: $(ollama --version)"
-    fi
-}
+
 
 # Check if Gemma model is available
 check_gemma_model() {
     print_status "Checking Gemma 3n model..."
-    # First check if Ollama server is running
-    if ! curl -s http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
-        print_warning "Ollama server not running. Starting it..."
-        start_ollama
-        sleep 3
-    fi
     
-    # Check if model exists
-    if ollama list | grep -q "gemma3n:e4b"; then
+    # Check if model directory exists
+    if [ -d "./models/gemma3n-2b" ] || [ -d "./models/gemma3n-4b" ]; then
         print_success "Gemma 3n model found"
         
         # Test model loading with a simple request
@@ -108,9 +77,8 @@ check_gemma_model() {
             reload_model
         fi
     else
-        print_warning "Gemma 3n model not found. Downloading..."
-        ollama pull gemma3n:e4b
-        print_success "Gemma 3n model downloaded successfully"
+        print_warning "Gemma 3n model not found. Please download models first:"
+        print_warning "python3 scripts/download_gemma_models.py --model both"
     fi
 }
 
@@ -122,16 +90,13 @@ test_model_loading() {
     while [ $attempt -le $max_attempts ]; do
         print_status "Testing model (attempt $attempt/$max_attempts)..."
         
-        # Try a simple test request
-        response=$(curl -s -X POST http://127.0.0.1:11434/api/chat \
+        # Try a simple test request to the model server
+        response=$(curl -s -X POST http://127.0.0.1:5001/chat \
             -H "Content-Type: application/json" \
-            -d '{
-                "model": "gemma3n:e4b",
-                "messages": [{"role": "user", "content": "Hello"}],
-                "stream": false
-            }' --max-time 30 2>/dev/null)
+            -d '{"messages": [{"role": "user", "content": "Hello"}]}' \
+            --max-time 30 2>/dev/null)
         
-        if echo "$response" | grep -q '"message"' && echo "$response" | grep -q '"content"'; then
+        if echo "$response" | grep -q '"success"' && echo "$response" | grep -q '"response"'; then
             return 0
         fi
         
@@ -148,7 +113,7 @@ reload_model() {
     print_status "Reloading Gemma 3n model..."
     
     # Stop any existing model processes
-    pkill -f "ollama.*gemma3n" 2>/dev/null || true
+    pkill -f "model_server" 2>/dev/null || true
     
     # Wait a moment
     sleep 2
@@ -207,34 +172,11 @@ generate_icons() {
     fi
 }
 
-# Start Ollama service
-start_ollama() {
-    print_status "Starting Ollama service..."
-    if ! pgrep -x "ollama" > /dev/null; then
-        print_warning "Ollama not running. Please start it manually in a separate terminal:"
-        print_warning "  ollama serve"
-        print_warning "Then press Enter to continue..."
-        read -r
-        
-        # Wait for Ollama to start
-        print_status "Waiting for Ollama to start..."
-        for i in {1..10}; do
-            if curl -s http://127.0.0.1:11434/api/tags > /dev/null 2>&1; then
-                print_success "Ollama service detected"
-                return 0
-            fi
-            sleep 1
-        done
-        print_error "Failed to detect Ollama service. Make sure it's running on http://127.0.0.1:11434"
-        exit 1
-    else
-        print_success "Ollama service already running"
-    fi
-}
+
 
 # Start uploads server
 start_uploads_server() {
-    print_status "Starting uploads server for Ollama access..."
+    print_status "Starting uploads server for model access..."
     print_success "Uploads server will be available at: http://localhost:11435"
     
     # Start uploads server in background
@@ -273,7 +215,6 @@ start_flask() {
 cleanup() {
     print_status "Shutting down..."
     print_success "RapidCare shutdown complete"
-    print_warning "Remember to stop Ollama manually if needed: pkill ollama"
     exit 0
 }
 
@@ -285,11 +226,10 @@ main() {
     echo ""
     detect_os
     check_python
-    check_ollama
     check_gemma_model
     install_dependencies
     generate_icons
-    start_ollama
+    start_uploads_server
     start_flask
 }
 

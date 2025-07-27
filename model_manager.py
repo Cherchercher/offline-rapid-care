@@ -5,19 +5,16 @@ from transformers import AutoProcessor, AutoModelForImageTextToText
 import torch
 
 class ModelManager:
-    """Unified Manager for Direct, Ollama, and Edge AI Modes"""
+    """Unified Manager for Direct and Edge AI Modes"""
 
-    def __init__(self, mode="auto", ollama_url="http://localhost:11434", android_webview_url="http://localhost:12345"):
+    def __init__(self, mode="auto", android_webview_url="http://localhost:12345"):
         """
         Args:
-            mode: "direct", "ollama", "edge_ai", or "auto"
-            ollama_url: Ollama API endpoint
+            mode: "direct", "edge_ai", or "auto"
             android_webview_url: HTTP bridge to Android WebView (for Edge AI)
         """
         self.mode = mode
-        self.ollama_url = ollama_url
         self.android_webview_url = android_webview_url
-        self.model_name = "gemma3n:e4b"
         
         self.direct_model = None
         self.direct_processor = None
@@ -28,7 +25,7 @@ class ModelManager:
         print(f"🚀 ModelManager initialized in {self.mode} mode")
 
     def _detect_best_mode(self):
-        """Auto-detect mode: try Edge AI first, then Ollama, fallback to direct"""
+        """Auto-detect mode: try Edge AI first, fallback to direct"""
         # 1. Try Edge AI (Android WebView bridge)
         try:
             response = requests.get(f"{self.android_webview_url}/health", timeout=2)
@@ -39,25 +36,13 @@ class ModelManager:
             print(f"Edge AI detection failed: {e}")
             pass
 
-        # 2. Try Ollama
-        try:
-            response = requests.get(f"{self.ollama_url}/api/tags", timeout=3)
-            if response.status_code == 200:
-                print("✅ Detected Ollama, using ollama mode.")
-                return "ollama"
-        except Exception as e:
-            print(f"Ollama detection failed: {e}")
-            pass
-
-        print("🔄 No Edge AI or Ollama detected, defaulting to direct mode.")
+        print("🔄 No Edge AI detected, defaulting to direct mode.")
         return "direct"
 
     def chat(self, prompt: str):
         """Unified chat interface"""
         if self.mode == "edge_ai":
             return self._chat_edge_ai(prompt)
-        elif self.mode == "ollama":
-            return self._chat_ollama(prompt)
         else:
             return self._chat_direct(prompt)
 
@@ -83,27 +68,7 @@ class ModelManager:
                 "mode": "edge_ai"
             }
 
-    def _chat_ollama(self, prompt: str):
-        """Chat using Ollama API"""
-        try:
-            payload = {
-                "model": self.model_name,
-                "messages": [{"role": "user", "content": prompt}]
-            }
-            response = requests.post(f"{self.ollama_url}/api/chat", json=payload, timeout=30)
-            response.raise_for_status()
-            result = response.json()
-            return {
-                "success": True,
-                "response": result.get("message", {}).get("content", ""),
-                "mode": "ollama"
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": f"Ollama error: {str(e)}",
-                "mode": "ollama"
-            }
+
 
     def _chat_direct(self, prompt: str):
         """Chat using local model with transformers"""
@@ -148,7 +113,7 @@ class ModelManager:
 
     def _load_direct_model(self):
         """Load the local Gemma model into CPU"""
-        model_path = "./models/gemma3n-local"
+        model_path = "./models/gemma3n-local-e2b"
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Local model not found at {model_path}")
@@ -187,8 +152,6 @@ class ModelManager:
         """Return current mode and model status"""
         return {
             "mode": self.mode,
-            "model_name": self.model_name,
             "direct_loaded": self.direct_model is not None,
-            "ollama_url": self.ollama_url,
             "android_webview_url": self.android_webview_url
         }
