@@ -2011,6 +2011,22 @@ body {
     animation: pulse-red 2s infinite;
 }
 
+.status-item.pending {
+    color: var(--warning-color);
+}
+
+.status-item.pending i {
+    animation: pulse-red 2s infinite;
+}
+
+.status-item.syncing {
+    color: var(--accent-color);
+}
+
+.status-item.syncing i {
+    animation: pulse-green 2s infinite;
+}
+
 @keyframes pulse-green {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.6; }

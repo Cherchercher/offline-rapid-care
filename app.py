@@ -8,6 +8,7 @@ from typing import Dict
 from model_manager_api import get_api_model_manager
 from database_setup import get_db_manager
 from vector_search import get_vector_search_manager
+from offline_storage_manager import offline_storage
 import re
 from prompts import CHARACTERISTIC_EXTRACTION_PROMPT, VITALS_EXTRACTION_PROMPT, MEDICAL_TRIAGE_PROMPT, REUNIFICATION_SEARCH_PROMPT, DESCRIPTION_PARSING_PROMPT, AUDIO_TRANSCRIPTION_PROMPT, MEDICAL_TRANSCRIPTION_PROMPT, SOAP_SUBJECTIVE_PROMPT, SOAP_OBJECTIVE_PROMPT, SOAP_ASSESSMENT_PROMPT, SOAP_PLAN_PROMPT, GENERAL_MEDICAL_ANALYSIS_PROMPT, FALLBACK_CHARACTERISTIC_PROMPT, AI_QUERY_SYSTEM_PROMPT_TEMPLATE, TRANSCRIBE_TEXT_SYSTEM_PROMPT_TEMPLATE, AUDIO_ENHANCEMENT_PROMPT_TEMPLATE
 from werkzeug.utils import secure_filename
@@ -295,7 +296,7 @@ def analyze_frame():
 
 @app.route('/api/analyze-media', methods=['POST'])
 def analyze_media():
-    """Analyze uploaded media files (images and videos)"""
+    """Analyze uploaded media files (images and videos) with offline support"""
     try:
         if 'files' not in request.files:
             return jsonify({'error': 'No files provided'}), 400
@@ -306,6 +307,67 @@ def analyze_media():
         if not files or files[0].filename == '':
             return jsonify({'error': 'No files selected'}), 400
         
+        # Check if we're offline
+        is_offline = not offline_storage.is_online()
+        
+        if is_offline:
+            # Check device capabilities for offline processing
+            device_capabilities = offline_storage.get_device_capabilities()
+            
+            if not device_capabilities['offline_processing_supported']:
+                return jsonify({
+                    'success': False,
+                    'error': 'Offline processing not supported on this device. Please use a Jetson device or ensure internet connectivity.',
+                    'device_info': {
+                        'is_jetson': device_capabilities['is_jetson'],
+                        'has_cuda': device_capabilities['has_cuda'],
+                        'memory_available': device_capabilities['memory_available'],
+                        'recommendation': 'Use a Jetson device for full offline capabilities'
+                    }
+                }), 400
+            
+            # Store files for offline processing
+            stored_tasks = []
+            for file in files:
+                if file.filename == '':
+                    continue
+                
+                # Save file to uploads directory first
+                filename = secure_filename(file.filename)
+                file_path = os.path.join(UPLOADS_DIR, filename)
+                file.save(file_path)
+                
+                # Determine task type
+                if file.content_type.startswith('image/'):
+                    task_type = 'image'
+                elif file.content_type.startswith('video/'):
+                    task_type = 'video'
+                else:
+                    continue
+                
+                # Store for offline processing
+                task_id = offline_storage.store_offline_task(
+                    task_type=task_type,
+                    file_path=file_path,
+                    original_filename=file.filename,
+                    metadata={'user_role': user_role}
+                )
+                stored_tasks.append({
+                    'task_id': task_id,
+                    'type': task_type,
+                    'filename': file.filename
+                })
+            
+            return jsonify({
+                'success': True,
+                'offline_mode': True,
+                'message': f'Stored {len(stored_tasks)} files for offline processing',
+                'stored_tasks': stored_tasks,
+                'device_info': device_capabilities,
+                'timestamp': datetime.now().isoformat()
+            })
+        
+        # Online mode - process normally
         analysis_results = []
         
         for file in files:
@@ -360,7 +422,7 @@ def analyze_media():
 
 @app.route('/api/voice/transcribe', methods=['POST'])
 def transcribe_voice():
-    """Transcribe voice input using Ollama"""
+    """Transcribe voice input with offline support"""
     try:
         if 'audio' not in request.files:
             return jsonify({'error': 'No audio file provided'}), 400
@@ -371,6 +433,48 @@ def transcribe_voice():
         if audio_file.filename == '':
             return jsonify({'error': 'No audio file selected'}), 400
         
+        # Check if we're offline
+        is_offline = not offline_storage.is_online()
+        
+        if is_offline:
+            # Check device capabilities for offline processing
+            device_capabilities = offline_storage.get_device_capabilities()
+            
+            if not device_capabilities['offline_processing_supported']:
+                return jsonify({
+                    'success': False,
+                    'error': 'Offline processing not supported on this device. Please use a Jetson device or ensure internet connectivity.',
+                    'device_info': {
+                        'is_jetson': device_capabilities['is_jetson'],
+                        'has_cuda': device_capabilities['has_cuda'],
+                        'memory_available': device_capabilities['memory_available'],
+                        'recommendation': 'Use a Jetson device for full offline capabilities'
+                    }
+                }), 400
+            
+            # Store audio for offline processing
+            filename = secure_filename(audio_file.filename)
+            file_path = os.path.join(UPLOADS_DIR, filename)
+            audio_file.save(file_path)
+            
+            # Store for offline processing
+            task_id = offline_storage.store_offline_task(
+                task_type='audio',
+                file_path=file_path,
+                original_filename=audio_file.filename,
+                metadata={'user_role': user_role}
+            )
+            
+            return jsonify({
+                'success': True,
+                'offline_mode': True,
+                'message': 'Audio stored for offline processing',
+                'task_id': task_id,
+                'device_info': device_capabilities,
+                'timestamp': datetime.now().isoformat()
+            })
+        
+        # Online mode - process normally
         # Save audio temporarily
         import tempfile
         import os
@@ -1502,6 +1606,70 @@ def status():
         'jetson_available': jetson_available,
         'timestamp': datetime.now().isoformat()
     })
+
+@app.route('/api/offline-storage/status', methods=['GET'])
+def get_offline_storage_status():
+    """Get offline storage status and statistics"""
+    try:
+        stats = offline_storage.get_storage_stats()
+        pending_tasks = offline_storage.get_pending_tasks()
+        
+        return jsonify({
+            'success': True,
+            'stats': stats,
+            'pending_tasks': len(pending_tasks),
+            'is_online': offline_storage.is_online()
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/offline-storage/process', methods=['POST'])
+def process_offline_tasks():
+    """Process all pending offline tasks"""
+    try:
+        # Get model manager for processing
+        model_manager = get_api_model_manager()
+        
+        # Process offline tasks
+        offline_storage.process_offline_tasks(model_manager)
+        
+        # Get updated stats
+        stats = offline_storage.get_storage_stats()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Offline tasks processed successfully',
+            'stats': stats
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/device/capabilities', methods=['GET'])
+def get_device_capabilities():
+    """Get device capabilities for offline processing"""
+    try:
+        capabilities = offline_storage.get_device_capabilities()
+        
+        return jsonify({
+            'success': True,
+            'capabilities': capabilities,
+            'recommendations': {
+                'jetson': 'Full offline processing support',
+                'high_end_gpu': 'Limited offline processing (if sufficient memory)',
+                'cpu_only': 'Online processing only'
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
 
 @app.route('/api/connectivity', methods=['GET'])
 def check_connectivity():

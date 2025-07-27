@@ -14,16 +14,34 @@ from prompts import MEDICAL_TRIAGE_PROMPT
 class ModelManagerPipeline:
     """Model manager using direct model loading for all tasks"""
     
-    def __init__(self, model_path: str = "./models/gemma3n-local", device: str = "cpu"):
+    def __init__(self, model_path: str = "./models/gemma3n-local", device: str = None):
         """
         Initialize direct model manager
         
         Args:
             model_path: Path to local model or Hugging Face model name
-            device: Device to run on ("cpu", "cuda:0", etc.)
+            device: Device to run on ("cpu", "cuda:0", etc.) - auto-detects if None
         """
         self.model_path = model_path
-        self.device = device
+        
+        # Auto-detect device for Jetson
+        if device is None:
+            if torch.cuda.is_available():
+                # Check if it's a Jetson device
+                if os.path.exists("/etc/nv_tegra_release"):
+                    print("🚀 Detected Jetson device, using CUDA")
+                    self.device = "cuda:0"
+                else:
+                    print("🚀 Detected CUDA device, using GPU")
+                    self.device = "cuda:0"
+            else:
+                print("🚀 No CUDA available, using CPU")
+                self.device = "cpu"
+        else:
+            self.device = device
+            
+        print(f"🎯 Using device: {self.device}")
+        
         self.direct_model = None
         self.direct_processor = None
         self._model_loaded = False
@@ -54,7 +72,7 @@ class ModelManagerPipeline:
             self.direct_model = AutoModelForImageTextToText.from_pretrained(
                 local_model_path, 
                 torch_dtype="auto", 
-                device_map="cpu",
+                device_map=self.device,
                 trust_remote_code=True,
                 low_cpu_mem_usage=True
             )

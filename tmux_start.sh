@@ -193,7 +193,7 @@ show_management_info() {
     echo "  ./tmux_stop.sh"
     echo ""
     echo "Test local model directly:"
-    echo "  python3 run_gemma_local.py"
+    echo "  python3 model_server.py"
     echo ""
     echo "View logs in real-time:"
     echo "  tmux attach-session -t rapidcare-app"

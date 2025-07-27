@@ -40,6 +40,12 @@ class RapidCareApp {
         // Start connectivity polling (more frequent)
         setInterval(() => this.checkServerConnectivity(), 10000);
         
+        // Start offline storage status polling
+        setInterval(() => this.checkOfflineStorageStatus(), 60000);
+        
+        // Check device capabilities on startup
+        this.checkDeviceCapabilities();
+        
         // Add online/offline event listeners
         window.addEventListener('online', () => this.handleOnline());
         window.addEventListener('offline', () => this.handleOffline());
@@ -1176,15 +1182,25 @@ class RapidCareApp {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
+                const errorData = await response.json();
+                if (errorData.error && errorData.error.includes('Offline processing not supported')) {
+                    this.addSystemMessage('❌ Offline processing not supported on this device. Please use a Jetson device or ensure internet connectivity.');
+                    return;
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
             
             if (data.success) {
-                this.addSystemMessage('Analysis complete!');
-                this.showTriageResult(data.analysis);
-                this.closeModal(document.getElementById('media-modal'));
+                if (data.offline_mode) {
+                    this.addSystemMessage(`✅ File stored for offline processing. Will be processed when online.`);
+                    this.closeModal(document.getElementById('media-modal'));
+                } else {
+                    this.addSystemMessage('Analysis complete!');
+                    this.showTriageResult(data.analysis);
+                    this.closeModal(document.getElementById('media-modal'));
+                }
             } else {
                 this.addSystemMessage(`Analysis failed: ${data.error}`);
             }
@@ -1219,15 +1235,25 @@ class RapidCareApp {
             clearTimeout(timeoutId);
 
             if (!response.ok) {
+                const errorData = await response.json();
+                if (errorData.error && errorData.error.includes('Offline processing not supported')) {
+                    this.addSystemMessage('❌ Offline processing not supported on this device. Please use a Jetson device or ensure internet connectivity.');
+                    return;
+                }
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
             }
 
             const data = await response.json();
             
             if (data.success) {
-                this.addSystemMessage('Analysis complete!');
-                this.showTriageResult(data.analysis);
-                this.closeModal(document.getElementById('media-modal'));
+                if (data.offline_mode) {
+                    this.addSystemMessage(`✅ File stored for offline processing. Will be processed when online.`);
+                    this.closeModal(document.getElementById('media-modal'));
+                } else {
+                    this.addSystemMessage('Analysis complete!');
+                    this.showTriageResult(data.analysis);
+                    this.closeModal(document.getElementById('media-modal'));
+                }
             } else {
                 this.addSystemMessage(`Analysis failed: ${data.error}`);
             }
@@ -2353,6 +2379,96 @@ class RapidCareApp {
                 }
             }
         });
+    }
+    
+    async checkOfflineStorageStatus() {
+        try {
+            const response = await fetch('/api/offline-storage/status');
+            const data = await response.json();
+            
+            if (data.success) {
+                const stats = data.stats;
+                
+                // Update offline storage indicator if it exists
+                const offlineStorageStatus = document.getElementById('offline-storage-status');
+                if (offlineStorageStatus) {
+                    if (stats.pending_tasks > 0) {
+                        offlineStorageStatus.innerHTML = `<i class="fas fa-database"></i> ${stats.pending_tasks} pending`;
+                        offlineStorageStatus.className = 'status-item pending';
+                    } else if (stats.processed_unsynced > 0) {
+                        offlineStorageStatus.innerHTML = `<i class="fas fa-sync"></i> ${stats.processed_unsynced} to sync`;
+                        offlineStorageStatus.className = 'status-item syncing';
+                    } else {
+                        offlineStorageStatus.innerHTML = `<i class="fas fa-database"></i> Ready`;
+                        offlineStorageStatus.className = 'status-item connected';
+                    }
+                }
+                
+                // Add system message if there are pending tasks
+                if (stats.pending_tasks > 0 && !this.offlineMessageShown) {
+                    this.addSystemMessage(`${stats.pending_tasks} files stored for offline processing. Will process when online.`);
+                    this.offlineMessageShown = true;
+                }
+            }
+        } catch (error) {
+            console.log('Offline storage status check failed:', error);
+        }
+    }
+    
+    async checkDeviceCapabilities() {
+        try {
+            const response = await fetch('/api/device/capabilities');
+            const data = await response.json();
+            
+            if (data.success) {
+                const capabilities = data.capabilities;
+                
+                // Update device status indicators
+                const jetsonStatus = document.getElementById('jetson-status');
+                const jetsonStatusMain = document.getElementById('jetson-status-main');
+                
+                if (jetsonStatus) {
+                    if (capabilities.is_jetson) {
+                        jetsonStatus.innerHTML = `<i class="fas fa-robot"></i> Jetson Ready`;
+                        jetsonStatus.className = 'status-item connected';
+                    } else if (capabilities.has_cuda) {
+                        jetsonStatus.innerHTML = `<i class="fas fa-microchip"></i> GPU Available`;
+                        jetsonStatus.className = 'status-item connected';
+                    } else {
+                        jetsonStatus.innerHTML = `<i class="fas fa-desktop"></i> CPU Only`;
+                        jetsonStatus.className = 'status-item disconnected';
+                    }
+                }
+                
+                if (jetsonStatusMain) {
+                    if (capabilities.is_jetson) {
+                        jetsonStatusMain.innerHTML = `<i class="fas fa-robot"></i> Jetson Ready`;
+                        jetsonStatusMain.className = 'status-item connected';
+                    } else if (capabilities.has_cuda) {
+                        jetsonStatusMain.innerHTML = `<i class="fas fa-microchip"></i> GPU Available`;
+                        jetsonStatusMain.className = 'status-item connected';
+                    } else {
+                        jetsonStatusMain.innerHTML = `<i class="fas fa-desktop"></i> CPU Only`;
+                        jetsonStatusMain.className = 'status-item disconnected';
+                    }
+                }
+                
+                // Store capabilities for offline processing checks
+                this.deviceCapabilities = capabilities;
+                
+                // Add system message about device capabilities
+                if (!this.deviceCapabilitiesShown) {
+                    if (capabilities.offline_processing_supported) {
+                        this.addSystemMessage('Device supports offline processing. Files will be stored locally when offline.');
+                    } else {
+                        this.addSystemMessage('Device does not support offline processing. Internet connection required for file analysis.');
+                    }
+                    this.deviceCapabilitiesShown = true;
+                }
+            }
+        } catch (error) {
+            console.log('Device capabilities check failed:', error);
+        }
     }
 
     openVoiceInputModal() {
