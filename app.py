@@ -15,9 +15,10 @@ from werkzeug.utils import secure_filename
 app = Flask(__name__)
 
 # Configuration
-OLLAMA_BASE_URL = "http://localhost:11434"
+EDGE_AI_URL = "http://localhost:8080"  # Google Edge AI endpoint
+JETSON_URL = "http://localhost:5000"   # Jetson AI endpoint
 GEMMA_MODEL = "gemma3n:e4b"
-USE_OLLAMA = True  # Set to False to use direct model loading
+USE_EDGE_AI = True  # Set to False to use direct model loading
 
 # Create uploads directory for temporary images
 UPLOADS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'uploads')
@@ -1473,12 +1474,81 @@ def status():
         except Exception as e:
             vector_status['error'] = str(e)
     
+    # Check Edge AI and Jetson availability
+    edge_ai_available = False
+    jetson_available = False
+    
+    try:
+        # Check if Edge AI is available
+        import requests
+        response = requests.get(f"{EDGE_AI_URL}/health", timeout=3)
+        edge_ai_available = response.status_code == 200
+    except:
+        pass
+    
+    try:
+        # Check if Jetson is available
+        import requests
+        response = requests.get(f"{JETSON_URL}/health", timeout=3)
+        jetson_available = response.status_code == 200
+    except:
+        pass
+    
     return jsonify({
         'model_status': model_status,
         'patients_count': len(patients),
         'vector_search': vector_status,
+        'edge_ai_available': edge_ai_available,
+        'jetson_available': jetson_available,
         'timestamp': datetime.now().isoformat()
     })
+
+@app.route('/api/connectivity', methods=['GET'])
+def check_connectivity():
+    """Check internet connectivity status"""
+    try:
+        # Test internet connectivity by making a request to a reliable service
+        test_urls = [
+            'https://httpbin.org/get',
+            'https://www.google.com',
+            'https://www.cloudflare.com'
+        ]
+        
+        is_online = False
+        response_time = None
+        
+        for url in test_urls:
+            try:
+                import requests
+                import time
+                
+                start_time = time.time()
+                response = requests.get(url, timeout=5)
+                end_time = time.time()
+                
+                if response.status_code == 200:
+                    is_online = True
+                    response_time = round((end_time - start_time) * 1000, 2)  # Convert to milliseconds
+                    break
+                    
+            except Exception as e:
+                print(f"Connectivity test failed for {url}: {e}")
+                continue
+        
+        return jsonify({
+            'success': True,
+            'online': is_online,
+            'response_time_ms': response_time,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'online': False,
+            'error': str(e),
+            'timestamp': datetime.now().isoformat()
+        })
 
 @app.route('/api/debug/vector-search', methods=['GET'])
 def debug_vector_search():

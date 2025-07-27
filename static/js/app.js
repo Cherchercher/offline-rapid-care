@@ -36,6 +36,13 @@ class RapidCareApp {
         
         // Start status polling
         setInterval(() => this.updateStatusIndicators(), 30000);
+        
+        // Start connectivity polling (more frequent)
+        setInterval(() => this.checkServerConnectivity(), 10000);
+        
+        // Add online/offline event listeners
+        window.addEventListener('online', () => this.handleOnline());
+        window.addEventListener('offline', () => this.handleOffline());
     }
 
     setupEventListeners() {
@@ -2040,6 +2047,18 @@ class RapidCareApp {
         if (stopBtn) stopBtn.style.display = 'none';
     }
 
+    startEdgeAIVoiceInput() {
+        this.addSystemMessage('Starting Google Edge AI voice input...');
+        // Implement Edge AI voice input logic here
+        this.addSystemMessage('Edge AI voice input not yet implemented');
+    }
+
+    startJetsonVoiceInput() {
+        this.addSystemMessage('Starting Jetson AI voice input...');
+        // Implement Jetson voice input logic here
+        this.addSystemMessage('Jetson AI voice input not yet implemented');
+    }
+
     showPatientsList() {
         this.loadAllPatients();
         this.showModal(document.getElementById('patients-list-modal'));
@@ -2182,17 +2201,21 @@ class RapidCareApp {
             const response = await fetch('/api/status');
             const data = await response.json();
             
-            const ollamaStatus = data.ollama_connected ? 'connected' : 'disconnected';
-            const modelStatus = data.model_loaded ? 'connected' : 'disconnected';
+            // Check for Edge AI and Jetson status from backend
+            const edgeAIStatus = data.edge_ai_available ? 'connected' : 'disconnected';
+            const jetsonStatus = data.jetson_available ? 'connected' : 'disconnected';
             
             // Update all status indicators
-            document.querySelectorAll('#ollama-status, #ollama-status-main').forEach(el => {
-                el.className = `status-item ${ollamaStatus}`;
+            document.querySelectorAll('#edge-ai-status, #edge-ai-status-main').forEach(el => {
+                el.className = `status-item ${edgeAIStatus}`;
             });
             
-            document.querySelectorAll('#model-status, #model-status-main').forEach(el => {
-                el.className = `status-item ${modelStatus}`;
+            document.querySelectorAll('#jetson-status, #jetson-status-main').forEach(el => {
+                el.className = `status-item ${jetsonStatus}`;
             });
+            
+            // Also check connectivity periodically
+            await this.checkServerConnectivity();
         } catch (error) {
             console.error('Error updating status:', error);
         }
@@ -2201,18 +2224,53 @@ class RapidCareApp {
     checkOnlineStatus() {
         this.isOnline = navigator.onLine;
         this.updateOfflineIndicator();
+        this.checkServerConnectivity();
+    }
+
+    async checkServerConnectivity() {
+        try {
+            const response = await fetch('/api/connectivity', {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                this.isOnline = data.online;
+                this.serverResponseTime = data.response_time_ms;
+                this.updateConnectivityIndicator();
+                
+                if (data.online) {
+                    this.addSystemMessage(`Internet connection active. Response time: ${data.response_time_ms}ms`);
+                } else {
+                    this.addSystemMessage('Internet connection unavailable. Working in offline mode.');
+                }
+            } else {
+                this.isOnline = false;
+                this.updateConnectivityIndicator();
+                this.addSystemMessage('Unable to verify internet connectivity. Working in offline mode.');
+            }
+        } catch (error) {
+            console.error('Connectivity check failed:', error);
+            this.isOnline = false;
+            this.updateConnectivityIndicator();
+            this.addSystemMessage('Internet connectivity check failed. Working in offline mode.');
+        }
     }
 
     handleOnline() {
         this.isOnline = true;
         this.updateOfflineIndicator();
-        this.addSystemMessage('Connection restored');
+        this.checkServerConnectivity();
+        this.addSystemMessage('Internet connection restored. All features available.');
     }
 
     handleOffline() {
         this.isOnline = false;
         this.updateOfflineIndicator();
-        this.addSystemMessage('Working offline - some features may be limited');
+        this.addSystemMessage('Internet connection lost. Some features may be limited.');
     }
 
     updateOfflineIndicator() {
@@ -2222,6 +2280,32 @@ class RapidCareApp {
         } else {
             indicator.classList.add('hidden');
         }
+    }
+
+    updateConnectivityIndicator() {
+        const connectivityIndicators = [
+            document.getElementById('connectivity-status'),
+            document.getElementById('connectivity-status-main')
+        ];
+        
+        connectivityIndicators.forEach(indicator => {
+            if (indicator) {
+                if (this.isOnline) {
+                    indicator.innerHTML = `
+                        <i class="fas fa-wifi" style="color: #10b981;"></i>
+                        <span>Online</span>
+                        ${this.serverResponseTime ? `<small>(${this.serverResponseTime}ms)</small>` : ''}
+                    `;
+                    indicator.className = 'status-item connected';
+                } else {
+                    indicator.innerHTML = `
+                        <i class="fas fa-wifi-slash" style="color: #ef4444;"></i>
+                        <span>Offline</span>
+                    `;
+                    indicator.className = 'status-item disconnected';
+                }
+            }
+        });
     }
 
     openVoiceInputModal() {
@@ -2426,10 +2510,13 @@ class RapidCareApp {
                         const match = data.text.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
                         if (match) {
                             aiCharacteristics = JSON.parse(match[1]);
+                            console.log('✅ Parsed characteristics from markdown block:', aiCharacteristics);
                         } else {
                             aiCharacteristics = JSON.parse(data.text);
+                            console.log('✅ Parsed characteristics directly:', aiCharacteristics);
                         }
                     } catch (e) {
+                        console.error('❌ Failed to parse characteristics:', e);
                         // fallback: leave as empty object
                         aiCharacteristics = {};
                     }
@@ -2440,6 +2527,7 @@ class RapidCareApp {
                 await this.reviewExtractedCharacteristics(aiCharacteristics, file);
                 // Now submit to local API to store the record
                 updateProgress(4, 'Saving to local database...');
+                console.log('📤 Submitting to backend with characteristics:', aiCharacteristics);
                 const edgeResponse = await fetch('/api/missing-persons/edge', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },

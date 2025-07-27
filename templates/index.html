@@ -14,9 +14,9 @@
 </head>
 <body>
     <div id="offline-indicator" class="hidden" style="position:fixed;top:0;left:0;width:100%;background:#dc2626;color:#fff;text-align:center;z-index:9999;padding:10px;display:none;">
-      <strong>⚠️ Offline</strong><br>
-      You are currently offline.<br>
-      Please check your internet connection.
+      <strong>⚠️ Offline Mode</strong><br>
+      Internet connection unavailable. Some features may be limited.<br>
+      <small>Working with local AI models only.</small>
     </div>
     <div id="app">
         <!-- Login Screen -->
@@ -69,13 +69,17 @@
                 
                 <div class="login-footer">
                     <div class="status-indicators">
-                        <div class="status-item" id="ollama-status">
-                            <i class="fas fa-circle"></i>
-                            <span>Ollama</span>
+                        <div class="status-item" id="connectivity-status">
+                            <i class="fas fa-wifi"></i>
+                            <span>Checking...</span>
                         </div>
-                        <div class="status-item" id="model-status">
-                            <i class="fas fa-brain"></i>
-                            <span>Gemma 3n</span>
+                        <div class="status-item" id="edge-ai-status">
+                            <i class="fas fa-microchip"></i>
+                            <span>Google Edge AI</span>
+                        </div>
+                        <div class="status-item" id="jetson-status">
+                            <i class="fas fa-robot"></i>
+                            <span>Jetson</span>
                         </div>
                     </div>
                 </div>
@@ -124,13 +128,17 @@
                         </button>
                     </div>
                     <div class="status-indicators">
-                        <div class="status-item" id="ollama-status-main">
-                            <i class="fas fa-circle"></i>
-                            <span>Ollama</span>
+                        <div class="status-item" id="connectivity-status-main">
+                            <i class="fas fa-wifi"></i>
+                            <span>Checking...</span>
                         </div>
-                        <div class="status-item" id="model-status-main">
-                            <i class="fas fa-brain"></i>
-                            <span>Gemma 3n</span>
+                        <div class="status-item" id="edge-ai-status-main">
+                            <i class="fas fa-microchip"></i>
+                            <span>Google Edge AI</span>
+                        </div>
+                        <div class="status-item" id="jetson-status-main">
+                            <i class="fas fa-robot"></i>
+                            <span>Jetson</span>
                         </div>
                     </div>
                 </div>

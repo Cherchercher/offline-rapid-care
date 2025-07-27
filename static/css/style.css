@@ -1997,6 +1997,30 @@ body {
     color: #ef4444;
 }
 
+.status-item small {
+    font-size: 0.75rem;
+    opacity: 0.8;
+    margin-left: 4px;
+}
+
+.status-item.connected i {
+    animation: pulse-green 2s infinite;
+}
+
+.status-item.disconnected i {
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-green {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+@keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
 .status-item i {
     font-size: 0.5rem;
 }
