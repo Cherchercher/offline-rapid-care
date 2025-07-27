@@ -98,6 +98,71 @@ VIDEO_IMAGE_SIZE=512
 
 # Flask Configuration
 FLASK_ENV=development
+```
+
+## 🔧 Important System Configuration Files
+
+### **Nginx Configuration**
+**File**: `/etc/nginx/conf.d/emr.nomadichacker.com.conf`
+**Purpose**: Web server configuration for production deployment
+**Key Settings**:
+```nginx
+client_max_body_size 500M;  # File upload limit
+proxy_connect_timeout 600s;  # Connection timeout
+proxy_send_timeout 600s;     # Send timeout
+proxy_read_timeout 600s;     # Read timeout
+send_timeout 600s;           # Response timeout
+```
+
+### **Application Configuration Files**
+| File | Purpose | Key Settings |
+|------|---------|--------------|
+| `app.py` | Main Flask application | Port 5050, CORS settings |
+| `model_server.py` | AI model API server | Port 5001, model loading |
+| `serve_uploads.py` | File upload server | Port 11435, file serving |
+| `tmux_start.sh` | Service startup script | Process management |
+| `tmux_stop.sh` | Service shutdown script | Process cleanup |
+
+### **Model Configuration**
+| File | Purpose | Location |
+|------|---------|----------|
+| `./models/gemma3n-2b/` | 2B model directory | Local storage |
+| `./models/gemma3n-4b/` | 4B model directory | Local storage |
+| `model_manager_pipeline.py` | Model loading logic | Dynamic selection |
+
+### **Database Files**
+| File | Purpose | Description |
+|------|---------|-------------|
+| `rapidcare_offline.db` | SQLite database | Patient data, offline tasks |
+| `database_setup.py` | Database initialization | Schema creation |
+
+### **Environment Configuration**
+| File | Purpose | Key Variables |
+|------|---------|---------------|
+| `requirements.txt` | Python dependencies | Flask, transformers, torch |
+| `.gitignore` | Version control exclusions | Models, databases, logs |
+
+### **Service Management**
+| File | Purpose | Commands |
+|------|---------|---------|
+| `start.sh` | Application startup | `./start.sh` |
+| `tmux_start.sh` | Service startup | `./tmux_start.sh` |
+| `tmux_stop.sh` | Service shutdown | `./tmux_stop.sh` |
+
+### **Testing and Validation**
+| File | Purpose | Usage |
+|------|---------|-------|
+| `scripts/test_load.py` | Load testing | `python scripts/test_load.py` |
+| `scripts/jetson_load_monitor.py` | System monitoring | `python scripts/jetson_load_monitor.py` |
+
+### **Production Deployment Checklist**
+1. **Nginx Configuration**: Update `/etc/nginx/conf.d/emr.nomadichacker.com.conf`
+2. **File Size Limits**: Set `client_max_body_size 500M`
+3. **Timeout Settings**: Configure proxy timeouts for long-running AI tasks
+4. **Model Directories**: Ensure models are in `./models/gemma3n-2b/` and `./models/gemma3n-4b/`
+5. **Service Startup**: Use `tmux_start.sh` for production deployment
+6. **Database**: Initialize with `python database_setup.py`
+7. **Permissions**: Ensure proper file permissions for uploads and models
 FLASK_DEBUG=1
 FLASK_HOST=0.0.0.0
 FLASK_PORT=5000

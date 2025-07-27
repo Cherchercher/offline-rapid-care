@@ -98,6 +98,12 @@ Our architecture supports intelligent model selection based on system load and a
 - **Moderate Load** (60-80% CPU, 70-85% memory): Uses 2B for quick tasks, 4B for complex tasks
 - **Low Load** (<60% CPU, <70% memory): Leverages 4B model for maximum performance
 
+## 📚 Documentation
+
+For detailed setup instructions, system configuration files, and deployment guides, see:
+- **[Setup Guide](setup_guide.md)** - Complete deployment and configuration instructions
+- **[TODO.md](TODO.md)** - Jetson device setup and advanced features
+
 This approach demonstrates real-world production scenarios where organizations must balance performance with resource constraints, automatically optimizing for the best possible response quality given current system conditions.
 
 ### **Offline-First Design**
