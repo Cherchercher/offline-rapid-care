@@ -1163,10 +1163,17 @@ class RapidCareApp {
             formData.append('files', file);
             formData.append('role', this.currentRole);
 
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout
+
             const response = await fetch('/api/analyze-media', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1183,7 +1190,11 @@ class RapidCareApp {
             }
         } catch (error) {
             console.error('Error analyzing image:', error);
-            this.addSystemMessage(`Error: ${error.message}`);
+            if (error.name === 'AbortError') {
+                this.addSystemMessage('Analysis timed out after 10 minutes. Please try again.');
+            } else {
+                this.addSystemMessage(`Error: ${error.message}`);
+            }
         }
     }
 
@@ -1195,10 +1206,17 @@ class RapidCareApp {
             formData.append('files', file);
             formData.append('role', this.currentRole);
 
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutes timeout for video
+
             const response = await fetch('/api/analyze-media', {
                 method: 'POST',
-                body: formData
+                body: formData,
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}: ${response.statusText}`);
@@ -1215,7 +1233,11 @@ class RapidCareApp {
             }
         } catch (error) {
             console.error('Error analyzing video:', error);
-            this.addSystemMessage(`Error: ${error.message}`);
+            if (error.name === 'AbortError') {
+                this.addSystemMessage('Video analysis timed out after 10 minutes. Please try again.');
+            } else {
+                this.addSystemMessage(`Error: ${error.message}`);
+            }
         }
     }
 
@@ -2071,9 +2093,12 @@ class RapidCareApp {
             
             if (data.success) {
                 this.displayAllPatients(data.patients);
+            } else {
+                this.displayAllPatients([]);
             }
         } catch (error) {
             console.error('Error loading all patients:', error);
+            this.displayAllPatients([]);
         }
     }
 
@@ -2081,9 +2106,11 @@ class RapidCareApp {
         const container = document.getElementById('all-patients-list');
         const countSpan = document.getElementById('patients-count');
         
+        // Update count immediately
+        countSpan.textContent = `${patients.length} patient${patients.length !== 1 ? 's' : ''}`;
+        
         if (patients.length === 0) {
             container.innerHTML = '<p class="no-patients">No patients recorded yet</p>';
-            countSpan.textContent = '0 patients';
             return;
         }
 
@@ -2198,7 +2225,16 @@ class RapidCareApp {
 
     async updateStatusIndicators() {
         try {
-            const response = await fetch('/api/status');
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 seconds timeout
+
+            const response = await fetch('/api/status', {
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
             const data = await response.json();
             
             // Check for Edge AI and Jetson status from backend
@@ -2224,17 +2260,28 @@ class RapidCareApp {
     checkOnlineStatus() {
         this.isOnline = navigator.onLine;
         this.updateOfflineIndicator();
-        this.checkServerConnectivity();
+        this.updateConnectivityIndicator();
+        // Only do detailed connectivity check if we think we're online
+        if (this.isOnline) {
+            this.checkServerConnectivity();
+        }
     }
 
     async checkServerConnectivity() {
         try {
+            // Create AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 seconds timeout
+
             const response = await fetch('/api/connectivity', {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                signal: controller.signal
             });
+
+            clearTimeout(timeoutId);
             
             if (response.ok) {
                 const data = await response.json();
@@ -2263,7 +2310,7 @@ class RapidCareApp {
     handleOnline() {
         this.isOnline = true;
         this.updateOfflineIndicator();
-        this.checkServerConnectivity();
+        this.updateConnectivityIndicator();
         this.addSystemMessage('Internet connection restored. All features available.');
     }
 
