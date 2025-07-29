@@ -12,6 +12,131 @@ This cutting-edge app is designed to operate fully offline on mobile devices, in
 
 ## 🏗️ Architecture Overview
 
+### **System Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    RapidCare System Architecture               │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+│  │   Web Browser   │    │   Mobile PWA    │    │  Desktop    │ │
+│  │   (Chrome)      │    │   (Android/iOS) │    │  (Windows)  │ │
+│  └─────────┬───────┘    └─────────┬───────┘    └─────┬───────┘ │
+│            │                      │                  │         │
+│            └──────────────────────┼──────────────────┘         │
+│                                   │                            │
+│  ┌─────────────────────────────────┼────────────────────────────┐ │
+│  │         HTTP Bridge Layer       │                            │ │
+│  │  (Progressive Web App)          │                            │ │
+│  └─────────────────┬───────────────┘                            │
+│                    │                                            │
+│  ┌─────────────────┼────────────────────────────────────────────┐ │
+│  │              Backend Services                                │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │ │
+│  │  │   Flask     │ │   Model     │ │     File Upload         │ │ │
+│  │  │   App       │ │   Server    │ │     Server              │ │ │
+│  │  │  (Port 5050)│ │ (Port 5001) │ │    (Port 11435)         │ │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────────┘ │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                                   │                            │
+│  ┌─────────────────────────────────┼────────────────────────────┐ │
+│  │            AI Models                                           │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │ │
+│  │  │  Gemma 3n   │ │  Gemma 3n   │ │    Dynamic Model        │ │ │
+│  │  │    2B       │ │    4B       │ │    Selection            │ │ │
+│  │  │  (CPU)      │ │  (GPU)      │ │    (Load-based)         │ │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────────┘ │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+│                                   │                            │
+│  ┌─────────────────────────────────┼────────────────────────────┐ │
+│  │            Storage Layer                                      │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐ │ │
+│  │  │   SQLite    │ │   Local     │ │     Offline Sync        │ │ │
+│  │  │  Database   │ │   Storage   │ │     Manager             │ │ │
+│  │  │ (Patients)  │ │ (Files)     │ │    (Jetson)            │ │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────────┘ │ │
+│  └───────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### **Deployment Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Deployment Options                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
+│  │   AWS EC2       │    │   Google Edge   │    │   Jetson    │ │
+│  │   (CPU Only)    │    │      AI         │    │   Device    │ │
+│  │                 │    │                 │    │             │ │
+│  │ • r6i.xlarge   │    │ • Edge Device   │    │ • Xavier NX │ │
+│  │ • 2B Model     │    │ • 4B Model      │    │ • 4B Model  │ │
+│  │ • Web Access   │    │ • Offline Cap.  │    │ • Offline   │ │
+│  │ • 500MB Limit  │    │ • Local Storage │    │ • Local DB  │ │
+│  └─────────────────┘    └─────────────────┘    └─────────────┘ │
+│                                                                 │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │              Production Deployment                          │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │ │
+│  │  │   Nginx     │ │   Flask     │ │     Model Server    │   │ │
+│  │  │   Proxy     │ │   App       │ │     (GPU/CPU)       │   │ │
+│  │  │  (Port 443) │ │ (Port 5050) │ │    (Port 5001)      │   │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────┘   │ │
+│  └─────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### **Data Flow Architecture**
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Data Flow Diagram                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  User Input ──┐                                                │
+│               │                                                │
+│  ┌────────────┴────────────┐                                   │
+│  │      Media Upload       │                                   │
+│  │  (Image/Video/Audio)    │                                   │
+│  └────────────┬────────────┘                                   │
+│               │                                                │
+│  ┌────────────┴────────────┐                                   │
+│  │    File Processing      │                                   │
+│  │  (Upload Server)        │                                   │
+│  └────────────┬────────────┘                                   │
+│               │                                                │
+│  ┌────────────┴────────────┐                                   │
+│  │   Model Selection       │                                   │
+│  │  (Load-based Logic)     │                                   │
+│  │  • High Load → 2B       │                                   │
+│  │  • Low Load → 4B        │                                   │
+│  └────────────┬────────────┘                                   │
+│               │                                                │
+│  ┌────────────┴────────────┐                                   │
+│  │    AI Analysis          │                                   │
+│  │  (Gemma 3n Model)       │                                   │
+│  │  • Medical Triage       │                                   │
+│  │  • Patient Assessment   │                                   │
+│  └────────────┬────────────┘                                   │
+│               │                                                │
+│  ┌────────────┴────────────┐                                   │
+│  │   Result Processing     │                                   │
+│  │  • Triage Level         │                                   │
+│  │  • Patient Creation     │                                   │
+│  │  • Database Storage     │                                   │
+│  └────────────┬────────────┘                                   │
+│               │                                                │
+│  ┌────────────┴────────────┐                                   │
+│  │   Offline Sync          │                                   │
+│  │  (When Online)          │                                   │
+│  │  • Cloud Storage        │                                   │
+│  │  • Data Backup          │                                   │
+│  └─────────────────────────┘                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
 ### **Key Technologies:**
 
 #### **Progressive Web App (PWA)**
@@ -19,6 +144,17 @@ By leveraging the power of PWA, we ensure that RapidCare is accessible across We
 
 #### **Offline Capabilities**
 Through an HTTP Bridge, RapidCare can communicate with on-device AI for tasks like image analysis, enabling the app to function seamlessly without cloud dependence.
+
+#### **Medical Image Triage Fine-tuning**
+Our medical image triage system is fine-tuned using Unsloth with comprehensive injury image datasets, extracting precise triage information including:
+
+- **Triage Level Classification**: Red (Immediate), Yellow (Delayed), Green (Minor), Black (Deceased)
+- **Detailed Reasoning**: AI-generated explanations for triage decisions based on visual assessment
+- **Patient Information Extraction**: Age estimation, gender identification, and brief assessment findings
+- **Injury Pattern Recognition**: Automated detection of trauma patterns, bleeding, fractures, and burns
+- **Vital Sign Indicators**: Visual assessment of consciousness, breathing patterns, and circulation
+
+The fine-tuned model processes medical images in real-time, providing structured output that integrates seamlessly with our patient management system for immediate triage decisions in mass casualty scenarios. (See training here: https://colab.research.google.com/drive/1lAwg-rEmwbxqGlrPTpMuPVV78T2wz6dV?usp=sharing)
 
 #### **On-Device AI Processing**
 With Google Edge AI and Jetson devices, all critical tasks are processed locally, ensuring rapid and reliable responses even in the most chaotic environments. When there's no internet connectivity, data is first stored in Jetson device. When internet comes back, Jetson syncs the data in storage to the cloud.
@@ -97,6 +233,74 @@ Our architecture supports intelligent model selection based on system load and a
 - **High Load Conditions** (>80% CPU, >85% memory, >90% GPU): Automatically selects 2B model
 - **Moderate Load** (60-80% CPU, 70-85% memory): Uses 2B for quick tasks, 4B for complex tasks
 - **Low Load** (<60% CPU, <70% memory): Leverages 4B model for maximum performance
+
+## 🚀 Future Enhancements
+
+### **Multi-Language Support**
+- **International Deployment**: Support for Spanish, French, Arabic, Mandarin, and other languages common in emergency scenarios
+- **Voice Recognition**: Multi-language speech-to-text for hands-free operation in diverse environments
+- **Cultural Adaptation**: Region-specific triage protocols and medical terminology
+- **Translation Services**: Real-time translation for international emergency response teams
+
+### **Hospital Integration & Resource Management**
+- **Bed Availability**: Real-time sync with local hospital databases to locate available beds and resources
+- **Transfer Coordination**: Automated patient transfer scheduling and routing
+- **Resource Tracking**: Monitor medical supplies, equipment, and personnel availability
+- **Capacity Planning**: Predictive analytics for resource allocation during mass casualty events
+
+### **Advanced AI Model Fine-tuning**
+- **Specialized Training**: Fine-tune models for specific medical specialties (trauma, pediatrics, geriatrics)
+- **Regional Adaptation**: Train models on local medical protocols and regional health guidelines
+- **Continuous Learning**: Implement feedback loops to improve model accuracy based on real-world outcomes
+- **Specialized Tasks**: Custom training for wound assessment, medication interaction checking, and vital sign interpretation
+
+### **Enhanced Offline Capabilities**
+- **Distributed Processing**: Multi-device coordination for large-scale incidents
+- **Mesh Networking**: Device-to-device communication without internet infrastructure
+- **Data Synchronization**: Intelligent conflict resolution for offline data merging
+- **Battery Optimization**: Power management for extended field operations
+
+### **Advanced Analytics & Reporting**
+- **Predictive Triage**: Machine learning models to predict patient deterioration
+- **Epidemiological Tracking**: Pattern recognition for disease outbreaks and injury trends
+- **Performance Metrics**: Real-time analytics on response times and outcomes
+- **Quality Assurance**: Automated auditing of triage decisions and patient outcomes
+
+### **IoT & Wearable Integration**
+- **Vital Sign Monitoring**: Real-time integration with wearable devices and medical sensors
+- **Environmental Sensors**: Air quality, radiation, and chemical exposure monitoring
+- **Location Services**: GPS tracking for patient and responder safety
+- **Smart Alerts**: Automated notifications for critical patient conditions
+
+### **Security & Compliance**
+- **HIPAA Compliance**: Enhanced data encryption and privacy protection
+- **Audit Trails**: Comprehensive logging for regulatory compliance
+- **Access Control**: Role-based permissions and multi-factor authentication
+- **Data Governance**: Automated data retention and disposal policies
+
+### **Mobile & Edge Computing**
+- **5G Integration**: Ultra-low latency communication for real-time collaboration
+- **Edge AI**: Distributed AI processing across multiple edge devices
+- **Augmented Reality**: AR overlays for medical procedures and training
+- **Voice Commands**: Advanced natural language processing for hands-free operation
+
+### **Collaboration & Communication**
+- **Team Coordination**: Real-time communication between emergency response teams
+- **Family Reunification**: Enhanced missing person tracking and family notification
+- **Inter-agency Integration**: Seamless coordination between police, fire, and medical services
+- **Public Communication**: Automated public announcements and emergency broadcasts
+
+### **Scalability & Performance**
+- **Microservices Architecture**: Modular deployment for better scalability
+- **Load Balancing**: Intelligent distribution of processing load across multiple servers
+- **Auto-scaling**: Dynamic resource allocation based on incident scale
+- **Disaster Recovery**: Robust backup and recovery systems for critical operations
+
+### **Research & Development**
+- **Clinical Trials**: Integration with research protocols for evidence-based improvements
+- **Data Sharing**: Secure sharing of anonymized data for medical research
+- **A/B Testing**: Continuous improvement through controlled experimentation
+- **Academic Partnerships**: Collaboration with medical schools and research institutions
 
 ## 📚 Documentation
 
