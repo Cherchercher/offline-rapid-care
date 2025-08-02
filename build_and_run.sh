@@ -30,29 +30,9 @@ touch offload/.gitkeep
 
 # Check if models need to be downloaded
 if [ ! -d "models/gemma3n-4b" ]; then
-    echo "📥 Models not found. Downloading finetuned 4B model..."
+    echo "📥 Models not found. Will download inside Docker container..."
     echo "   This will download the injury detection finetuned model (~8GB)"
-    
-    # Check if Python and required packages are available
-    if command -v python3 &> /dev/null; then
-        # Check if transformers is available
-        if python3 -c "import transformers" 2>/dev/null; then
-            echo "✅ Python and transformers available. Downloading model..."
-            python3 scripts/download_gemma_models.py --model 4b --check-space
-        else
-            echo "⚠️  Transformers not available. Installing in temporary environment..."
-            # Create temporary virtual environment for downloading
-            python3 -m venv temp_download_env
-            source temp_download_env/bin/activate
-            pip install transformers huggingface_hub torch
-            python3 scripts/download_gemma_models.py --model 4b --check-space
-            deactivate
-            rm -rf temp_download_env
-        fi
-    else
-        echo "❌ Python3 not available. Please install Python3 and try again."
-        exit 1
-    fi
+    echo "   Models will be downloaded after Docker image is built."
 else
     echo "✅ Models already exist in models/gemma3n-4b/"
 fi
@@ -77,8 +57,16 @@ docker run -d \
     -v $(pwd)/uploads:/workspace/uploads \
     -v $(pwd)/rapidcare_offline.db:/workspace/rapidcare_offline.db \
     -v $(pwd)/offload:/workspace/offload \
+    -v $(pwd)/scripts:/workspace/scripts \
     --restart unless-stopped \
     offline-gemma-jetson
+
+# Download models inside container if they don't exist
+if [ ! -d "models/gemma3n-4b" ]; then
+    echo "📥 Downloading models inside Docker container..."
+    docker exec offline-gemma-jetson python3 /workspace/scripts/download_gemma_models.py --model 4b --check-space
+    echo "✅ Models downloaded successfully!"
+fi
 
 # Wait for container to start
 echo "⏳ Waiting for container to start..."
