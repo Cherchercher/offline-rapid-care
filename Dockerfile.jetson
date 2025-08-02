@@ -1,12 +1,12 @@
-# Multi-stage Dockerfile for Jetson Xavier
+# Multi-stage Dockerfile for Jetson Xavier with SQLite compatibility
 # Stage 1: Base PyTorch image
 FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
 
 # Stage 2: Transformers image
-FROM dustynv/transformers:r35.3.1 as transformers-base
+FROM dustynv/transformers:r35.1.1 as transformers-base
 
 # Stage 3: Final application image
-FROM dustynv/transformers:r35.3.1
+FROM dustynv/transformers:r35.1.1
 
 # Set environment variables
 ENV PYTHONPATH=/workspace
@@ -51,8 +51,8 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 # Set working directory
 WORKDIR /workspace
 
-# Copy requirements first for better caching
-COPY requirements.txt .
+# Copy Jetson-compatible requirements first for better caching
+COPY requirements_jetson.txt requirements.txt
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
@@ -61,8 +61,7 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 RUN pip3 install --no-cache-dir \
     pyaudio \
     psycopg2-binary \
-    opencv-python-headless \
-    sentence-transformers
+    opencv-python-headless
 
 # Copy application code
 COPY . .
