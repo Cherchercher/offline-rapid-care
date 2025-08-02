@@ -297,24 +297,42 @@ def analyze_frame():
 @app.route('/api/analyze-media', methods=['POST'])
 def analyze_media():
     """Analyze uploaded media files (images and videos) with offline support"""
+    print("🎬 ===== /api/analyze-media called =====")
+    print(f"📋 Request method: {request.method}")
+    print(f"📋 Content-Type: {request.content_type}")
+    print(f"📋 Files in request: {list(request.files.keys())}")
+    
     try:
         if 'files' not in request.files:
+            print("❌ No files in request")
             return jsonify({'error': 'No files provided'}), 400
         
         files = request.files.getlist('files')
         user_role = request.form.get('role', 'PARAMEDIC')
         
+        print(f"📁 Number of files: {len(files)}")
+        print(f"👤 User role: {user_role}")
+        
+        for i, file in enumerate(files):
+            print(f"📄 File {i+1}: {file.filename} ({file.content_type})")
+        
         if not files or files[0].filename == '':
+            print("❌ No files selected")
             return jsonify({'error': 'No files selected'}), 400
         
         # Check if we're offline
         is_offline = not offline_storage.is_online()
+        print(f"🌐 Offline mode: {is_offline}")
         
         if is_offline:
+            print("🔄 Processing in OFFLINE mode")
+            
             # Check device capabilities for offline processing
             device_capabilities = offline_storage.get_device_capabilities()
+            print(f"🔧 Device capabilities: {device_capabilities}")
             
             if not device_capabilities['offline_processing_supported']:
+                print("❌ Offline processing not supported")
                 return jsonify({
                     'success': False,
                     'error': 'Offline processing not supported on this device. Please use a Jetson device or ensure internet connectivity.',
@@ -326,26 +344,58 @@ def analyze_media():
                     }
                 }), 400
             
-            # Store files for offline processing
+            print("✅ Offline processing supported, proceeding...")
+            
+            # Process files immediately with on-device model
+            analysis_results = []
             stored_tasks = []
+            
             for file in files:
                 if file.filename == '':
                     continue
                 
+                print(f"📁 Processing file: {file.filename}")
+                
                 # Save file to uploads directory first
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(UPLOADS_DIR, filename)
-                file.save(file_path)
                 
-                # Determine task type
+                print(f"💾 Saving to: {file_path}")
+                
+                # Ensure uploads directory exists
+                os.makedirs(UPLOADS_DIR, exist_ok=True)
+                
+                file.save(file_path)
+                print(f"✅ File saved successfully")
+                
+                # Determine task type and process immediately
                 if file.content_type.startswith('image/'):
                     task_type = 'image'
+                    # Process image immediately
+                    analysis = analyze_image_file(file, user_role)
+                    analysis_results.append({
+                        'type': 'image',
+                        'filename': file.filename,
+                        'analysis': analysis
+                    })
+                    
                 elif file.content_type.startswith('video/'):
                     task_type = 'video'
+                    print(f"🎬 Processing VIDEO: {file.filename}")
+                    # Process video immediately
+                    print("🔄 Calling analyze_video_file...")
+                    analysis = analyze_video_file(file, user_role)
+                    print(f"📊 Video analysis result: {analysis[:200] if analysis else 'None'}...")
+                    analysis_results.append({
+                        'type': 'video',
+                        'filename': file.filename,
+                        'analysis': analysis
+                    })
+                    print("✅ Video processing completed")
                 else:
                     continue
                 
-                # Store for offline processing
+                # Also store for offline backup (in case processing fails)
                 task_id = offline_storage.store_offline_task(
                     task_type=task_type,
                     file_path=file_path,
@@ -358,14 +408,37 @@ def analyze_media():
                     'filename': file.filename
                 })
             
-            return jsonify({
-                'success': True,
-                'offline_mode': True,
-                'message': f'Stored {len(stored_tasks)} files for offline processing',
-                'stored_tasks': stored_tasks,
-                'device_info': device_capabilities,
-                'timestamp': datetime.now().isoformat()
-            })
+            # Return processed results immediately
+            print(f"📊 Analysis results count: {len(analysis_results)}")
+            
+            if len(analysis_results) == 1:
+                individual_analysis = analysis_results[0]['analysis']
+                print("📤 Returning single file analysis")
+                response = {
+                    'success': True,
+                    'offline_mode': True,
+                    'analysis': individual_analysis,
+                    'details': analysis_results,
+                    'stored_tasks': stored_tasks,
+                    'device_info': device_capabilities,
+                    'message': f'Processed {len(analysis_results)} files with on-device model',
+                    'timestamp': datetime.now().isoformat()
+                }
+                print(f"📤 Response: {response}")
+                return jsonify(response)
+            else:
+                # Multiple files - combine results
+                combined_analysis = combine_analysis_results(analysis_results, user_role)
+                return jsonify({
+                    'success': True,
+                    'offline_mode': True,
+                    'analysis': combined_analysis,
+                    'details': analysis_results,
+                    'stored_tasks': stored_tasks,
+                    'device_info': device_capabilities,
+                    'message': f'Processed {len(analysis_results)} files with on-device model',
+                    'timestamp': datetime.now().isoformat()
+                })
         
         # Online mode - process normally
         analysis_results = []
@@ -373,6 +446,9 @@ def analyze_media():
         for file in files:
             if file.filename == '':
                 continue
+            
+            # Ensure uploads directory exists for any file operations
+            os.makedirs(UPLOADS_DIR, exist_ok=True)
                 
             # Determine file type
             if file.content_type.startswith('image/'):
@@ -413,6 +489,7 @@ def analyze_media():
             })
         
     except Exception as e:
+        print(f"❌ ERROR in /api/analyze-media: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({
@@ -455,6 +532,10 @@ def transcribe_voice():
             # Store audio for offline processing
             filename = secure_filename(audio_file.filename)
             file_path = os.path.join(UPLOADS_DIR, filename)
+            
+            # Ensure uploads directory exists
+            os.makedirs(UPLOADS_DIR, exist_ok=True)
+            
             audio_file.save(file_path)
             
             # Store for offline processing
