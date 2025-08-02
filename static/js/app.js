@@ -2422,13 +2422,18 @@ class RapidCareApp {
                 const jetsonStatus = document.getElementById('jetson-status');
                 const jetsonStatusMain = document.getElementById('jetson-status-main');
                 
+                // Show only one AI processing option
+                const jetsonAvailable = capabilities.is_jetson || capabilities.has_cuda;
+                
                 if (jetsonStatus) {
                     if (capabilities.is_jetson) {
                         jetsonStatus.innerHTML = `<i class="fas fa-robot"></i> Jetson Ready`;
                         jetsonStatus.className = 'status-item connected';
+                        jetsonStatus.style.display = 'flex';
                     } else if (capabilities.has_cuda) {
                         jetsonStatus.innerHTML = `<i class="fas fa-microchip"></i> GPU Available`;
                         jetsonStatus.className = 'status-item connected';
+                        jetsonStatus.style.display = 'flex';
                     } else {
                         jetsonStatus.innerHTML = `<i class="fas fa-desktop"></i> Online Processing`;
                         jetsonStatus.className = 'status-item connected';
@@ -2439,9 +2444,11 @@ class RapidCareApp {
                     if (capabilities.is_jetson) {
                         jetsonStatusMain.innerHTML = `<i class="fas fa-robot"></i> Jetson Ready`;
                         jetsonStatusMain.className = 'status-item connected';
+                        jetsonStatusMain.style.display = 'flex';
                     } else if (capabilities.has_cuda) {
                         jetsonStatusMain.innerHTML = `<i class="fas fa-microchip"></i> GPU Available`;
                         jetsonStatusMain.className = 'status-item connected';
+                        jetsonStatusMain.style.display = 'flex';
                     } else {
                         jetsonStatusMain.innerHTML = `<i class="fas fa-desktop"></i> Online Processing`;
                         jetsonStatusMain.className = 'status-item connected';
