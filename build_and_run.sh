@@ -53,6 +53,8 @@ docker run -d \
     --runtime=nvidia \
     --gpus all \
     -p 0.0.0.0:5050:5050 \
+    -p 0.0.0.0:5001:5001 \
+    -p 0.0.0.0:11435:11435 \
     -v $(pwd)/models:/workspace/models \
     -v $(pwd)/uploads:/workspace/uploads \
     -v $(pwd)/rapidcare_offline.db:/workspace/rapidcare_offline.db \
@@ -74,6 +76,43 @@ fi
 echo "⏳ Waiting for container to start..."
 sleep 10
 
+# Start all services inside the container
+echo "🚀 Starting all services inside container..."
+
+echo "📡 Starting Uploads Server (port 11435)..."
+docker exec -d offline-gemma-jetson python3 serve_uploads.py
+
+echo "🤖 Starting Model API Server (port 5001)..."
+docker exec -d offline-gemma-jetson python3 model_server.py
+
+# Wait for services to start
+echo "⏳ Waiting for services to start..."
+sleep 15
+
+# Check all services
+echo "🔍 Checking service status..."
+
+# Check uploads server
+if curl -s http://localhost:11435 > /dev/null 2>&1; then
+    echo "✅ Uploads Server: http://localhost:11435"
+else
+    echo "⚠️  Uploads Server: Still starting up..."
+fi
+
+# Check model API server
+if curl -s http://localhost:5001/health > /dev/null 2>&1; then
+    echo "✅ Model API Server: http://localhost:5001"
+else
+    echo "⚠️  Model API Server: Still starting up..."
+fi
+
+# Check Flask app
+if curl -s http://localhost:5050 > /dev/null 2>&1; then
+    echo "✅ Flask App: http://localhost:5050"
+else
+    echo "⚠️  Flask App: Still starting up..."
+fi
+
 # Check container status
 echo "📊 Container status:"
 docker ps | grep offline-gemma-jetson
@@ -83,8 +122,10 @@ echo "📋 Container logs:"
 docker logs offline-gemma-jetson
 
 echo ""
-echo "✅ Offline Gemma is now running!"
+echo "✅ Offline Gemma is now running with all services!"
 echo "🌐 Access the application at: http://localhost:5050"
+echo "🤖 Model API available at: http://localhost:5001"
+echo "📁 Uploads server available at: http://localhost:11435"
 echo "📊 Monitor logs with: docker logs -f offline-gemma-jetson"
 echo "🛑 Stop with: docker stop offline-gemma-jetson"
 echo ""
