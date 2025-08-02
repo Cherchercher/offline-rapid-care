@@ -127,7 +127,7 @@ class DynamicModelManager:
             if torch.cuda.is_available():
                 try:
                     device_name = torch.cuda.get_device_name(0).lower()
-                    if 'tegra' in device_name or 'jetson' in device_name:
+                    if 'tegra' in device_name or 'jetson' in device_name or 'xavier' in device_name:
                         return True
                 except:
                     pass
