@@ -122,26 +122,38 @@ class ModelManager:
 
         self.direct_processor = AutoProcessor.from_pretrained(model_path, trust_remote_code=True)
 
+        # Auto-detect device for Jetson
+        if torch.cuda.is_available():
+            if os.path.exists("/etc/nv_tegra_release"):
+                print("🚀 Detected Jetson device, using CUDA")
+                device_map = "cuda:0"
+            else:
+                print("🚀 Detected CUDA device, using GPU")
+                device_map = "cuda:0"
+        else:
+            print("🚀 No CUDA available, using CPU")
+            device_map = "cpu"
+            
         try:
             self.direct_model = AutoModelForImageTextToText.from_pretrained(
                 model_path,
                 torch_dtype=torch.float16,
-                device_map="cpu",
+                device_map=device_map,
                 low_cpu_mem_usage=True,
                 trust_remote_code=True
             )
-            print("✅ Model loaded with float16 on CPU")
+            print(f"✅ Model loaded with float16 on {device_map}")
         except Exception as e:
             print(f"⚠️ float16 load failed: {e}")
             print("🔄 Trying float32...")
             self.direct_model = AutoModelForImageTextToText.from_pretrained(
                 model_path,
                 torch_dtype=torch.float32,
-                device_map="cpu",
+                device_map=device_map,
                 low_cpu_mem_usage=True,
                 trust_remote_code=True
             )
-            print("✅ Model loaded with float32 on CPU")
+            print(f"✅ Model loaded with float32 on {device_map}")
 
     def switch_mode(self, new_mode):
         """Switch between modes at runtime"""
