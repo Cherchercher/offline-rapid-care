@@ -31,22 +31,33 @@ def run_gemma_local():
     
     print("Loading Gemma 3n model from local directory...")
     
+    # Auto-detect device for Jetson
+    if torch.cuda.is_available():
+        if os.path.exists("/etc/nv_tegra_release"):
+            print("🚀 Detected Jetson device, using CUDA")
+            device_map = "cuda:0"
+        else:
+            print("🚀 Detected CUDA device, using GPU")
+            device_map = "cuda:0"
+    else:
+        print("🚀 No CUDA available, using CPU")
+        device_map = "cpu"
+    
     # Load processor and model from local directory
     processor = AutoProcessor.from_pretrained(
         LOCAL_MODEL_PATH, 
-        device_map="cpu",
         trust_remote_code=True
     )
     
     model = AutoModelForImageTextToText.from_pretrained(
         LOCAL_MODEL_PATH, 
         torch_dtype=torch.float32, 
-        device_map="cpu",
+        device_map=device_map,
         trust_remote_code=True,
         low_cpu_mem_usage=True
     )
     
-    print("Model loaded successfully on CPU")
+    print(f"Model loaded successfully on {device_map}")
     
     # Example 1: Text-only conversation
     print("\n=== Example 1: Text-only conversation ===")

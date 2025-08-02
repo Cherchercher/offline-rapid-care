@@ -50,6 +50,15 @@ cd offline-gemma
 ./build_and_run.sh
 ```
 
+or 
+```
+# Rebuild container with all fixes
+sudo docker stop offline-gemma-jetson
+sudo docker rm offline-gemma-jetson
+sudo docker build -t offline-gemma-jetson .
+./build_and_run.sh
+```
+
 **Note**: The build script will automatically download the finetuned 4B model (~8GB) if it's not already present.
 
 ### Option 2: Manual Docker Commands
