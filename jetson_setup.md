@@ -60,6 +60,10 @@ pip3 install soundfile librosa
 
 ## Model Download and Setup
 
+### Install Pytorch and Dependencies with docker
+nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3
+dustynv/transformers:r35.1.1.
+
 ### 1. Download Gemma 3n Models
 
 The project includes a convenient script to download Gemma 3n models. For Jetson Nano, we recommend starting with the 4B model for better performance:

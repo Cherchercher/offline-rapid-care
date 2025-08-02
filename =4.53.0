@@ -1,0 +1,8 @@
+Collecting transformers
+  Using cached transformers-4.46.3-py3-none-any.whl (10.0 MB)
+Requirement already satisfied: filelock in /home/cher/.local/lib/python3.8/site-packages (from transformers) (3.16.1)
+Collecting huggingface-hub<1.0,>=0.23.2
+  Using cached huggingface_hub-0.34.3-py3-none-any.whl (558 kB)
+Requirement already satisfied: numpy>=1.17 in /usr/lib/python3/dist-packages (from transformers) (1.17.4)
+Requirement already satisfied: packaging>=20.0 in /home/cher/.local/lib/python3.8/site-packages/setuptools/_vendor (from transformers) (24.1)
+Requirement already satisfied: pyyaml>=5.1 in /usr/lib/python3/dist-packages (from transformers) (5.3.1)
