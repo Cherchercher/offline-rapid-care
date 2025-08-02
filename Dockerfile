@@ -2,11 +2,11 @@
 # Stage 1: Base PyTorch image
 FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
 
-# Stage 2: Transformers image
-FROM dustynv/transformers:r35.3.1 as transformers-base
+# # Stage 2: Transformers image
+# FROM dustynv/transformers:latest as transformers-base
 
-# Stage 3: Final application image
-FROM dustynv/transformers:r35.3.1
+# # Stage 3: Final application image
+# FROM dustynv/transformers:latest
 
 # Set environment variables
 ENV PYTHONPATH=/workspace
@@ -57,6 +57,10 @@ COPY requirements.txt .
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Force install latest transformers for Gemma 3n compatibility
+RUN pip3 install --no-cache-dir --upgrade pip
+RUN pip3 install --no-cache-dir --upgrade transformers>=4.51.3
+
 # Install additional dependencies that might be needed
 RUN pip3 install --no-cache-dir \
     pyaudio \
@@ -83,7 +87,7 @@ ENV PYTHONUNBUFFERED=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:5050/api/status || exit 1
+    CMD curl -f http://localhost:5050/health || exit 1
 
 # Default command
 CMD ["python3", "app.py"] 
