@@ -113,7 +113,7 @@ class ModelManager:
 
     def _load_direct_model(self):
         """Load the local Gemma model into CPU"""
-        model_path = "./models/gemma3n-local-e2b"
+        model_path = "./models/gemma3n-4b"
 
         if not os.path.exists(model_path):
             raise FileNotFoundError(f"Local model not found at {model_path}")
