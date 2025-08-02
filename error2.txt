@@ -1,34 +1,3 @@
- Jetson Xavier...
-ERROR: permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.45/info": dial unix /var/run/docker.sock: connect: permission denied
-errors pretty printing info
-⚠️  NVIDIA Docker runtime not detected. GPU acceleration may not work.
-   Make sure you have nvidia-docker2 installed and configured.
-📁 Creating necessary directories...
-📥 Models not found. Downloading finetuned 4B model...
-   This will download the injury detection finetuned model (~8GB)
-⚠️  Transformers not available. Installing in temporary environment...
-
-docker logs -f offline-gemma-jetson
-permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock: Get "http://%2Fvar%2Frun%2Fdocker.sock/v1.45/containers/offline-gemma-jetson/json": dial unix /var/run/docker.sock: connect: permission denied
-
-The connection was reset
-
-The connection to the server was reset while the page was loading.
-
-    The site could be temporarily unavailable or too busy. Try again in a few moments.
-    If you are unable to load any pages, check your computer’s network connection.
-    If your computer or network is protected by a firewall or proxy, make sure that Firefox is permitted to access the web.
-
-
-✅ Offline Gemma is now running!
-🌐 Access the application at: http://localhost:5050
-📊 Monitor logs with: docker logs -f offline-gemma-jetson
-🛑 Stop with: docker stop offline-gemma-jetson
-
-📁 Model files are stored in: ./models/
-📁 Uploads will be stored in: ./uploads/
-📁 Offload files will be stored in: ./offload/
-
 cher@cher-desktop:~/app/offline-rapid-care$ sudo docker logs offline-gemma-jetson
 /usr/local/lib/python3.8/dist-packages/transformers/utils/hub.py:128: FutureWarning: Using `TRANSFORMERS_CACHE` is deprecated and will be removed in v5 of Transformers. Use `HF_HOME` instead.
   warnings.warn(
