@@ -326,8 +326,10 @@ def analyze_media():
                     }
                 }), 400
             
-            # Store files for offline processing
+            # Process files immediately with on-device model
+            analysis_results = []
             stored_tasks = []
+            
             for file in files:
                 if file.filename == '':
                     continue
@@ -337,15 +339,30 @@ def analyze_media():
                 file_path = os.path.join(UPLOADS_DIR, filename)
                 file.save(file_path)
                 
-                # Determine task type
+                # Determine task type and process immediately
                 if file.content_type.startswith('image/'):
                     task_type = 'image'
+                    # Process image immediately
+                    analysis = analyze_image_file(file, user_role)
+                    analysis_results.append({
+                        'type': 'image',
+                        'filename': file.filename,
+                        'analysis': analysis
+                    })
+                    
                 elif file.content_type.startswith('video/'):
                     task_type = 'video'
+                    # Process video immediately
+                    analysis = analyze_video_file(file, user_role)
+                    analysis_results.append({
+                        'type': 'video',
+                        'filename': file.filename,
+                        'analysis': analysis
+                    })
                 else:
                     continue
                 
-                # Store for offline processing
+                # Also store for offline backup (in case processing fails)
                 task_id = offline_storage.store_offline_task(
                     task_type=task_type,
                     file_path=file_path,
@@ -358,14 +375,32 @@ def analyze_media():
                     'filename': file.filename
                 })
             
-            return jsonify({
-                'success': True,
-                'offline_mode': True,
-                'message': f'Stored {len(stored_tasks)} files for offline processing',
-                'stored_tasks': stored_tasks,
-                'device_info': device_capabilities,
-                'timestamp': datetime.now().isoformat()
-            })
+            # Return processed results immediately
+            if len(analysis_results) == 1:
+                individual_analysis = analysis_results[0]['analysis']
+                return jsonify({
+                    'success': True,
+                    'offline_mode': True,
+                    'analysis': individual_analysis,
+                    'details': analysis_results,
+                    'stored_tasks': stored_tasks,
+                    'device_info': device_capabilities,
+                    'message': f'Processed {len(analysis_results)} files with on-device model',
+                    'timestamp': datetime.now().isoformat()
+                })
+            else:
+                # Multiple files - combine results
+                combined_analysis = combine_analysis_results(analysis_results, user_role)
+                return jsonify({
+                    'success': True,
+                    'offline_mode': True,
+                    'analysis': combined_analysis,
+                    'details': analysis_results,
+                    'stored_tasks': stored_tasks,
+                    'device_info': device_capabilities,
+                    'message': f'Processed {len(analysis_results)} files with on-device model',
+                    'timestamp': datetime.now().isoformat()
+                })
         
         # Online mode - process normally
         analysis_results = []
