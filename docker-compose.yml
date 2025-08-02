@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  offline-gemma:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: offline-gemma-jetson
+    ports:
+      - "5050:5050"
+    volumes:
+      # Mount models directory for persistent model storage
+      - ./models:/workspace/models
+      # Mount uploads directory for temporary files
+      - ./uploads:/workspace/uploads
+      # Mount database file
+      - ./rapidcare_offline.db:/workspace/rapidcare_offline.db
+      # Mount offload directory for model offloading
+      - ./offload:/workspace/offload
+    environment:
+      - PYTHONPATH=/workspace
+      - FLASK_APP=app.py
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5050/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # Optional: Add a database service if needed
+  # postgres:
+  #   image: postgres:13
+  #   environment:
+  #     POSTGRES_DB: rapidcare
+  #     POSTGRES_USER: rapidcare
+  #     POSTGRES_PASSWORD: rapidcare
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+
+# volumes:
+#   postgres_data: 
