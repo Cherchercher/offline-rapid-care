@@ -1,0 +1,47 @@
+desktop:~/app/offline-rapid-care$ python3 debug_jetson_detection.py 
+🚀 Jetson Detection Debug
+==================================================
+🔍 Checking Jetson Detection Indicators
+==================================================
+
+📁 Jetson-specific files:
+   ✅ /etc/nv_tegra_release - EXISTS
+      Content: # R35 (release), REVISION: 1.0, GCID: 31346300, BOARD: t186ref, EABI: aarch64, DATE: Thu Aug 25 18:41:45 UTC 2022
+   ✅ /proc/device-tree/model - EXISTS
+      Content: NVIDIA Jetson Xavier NX Developer Kit
+   ❌ /sys/module/tegra_fuse/parameters/tegra_chip_id - NOT FOUND
+
+🎮 CUDA Detection:
+   ❌ Error checking CUDA: libopenblas.so.0: cannot open shared object file: No such file or directory
+
+💻 System Information:
+   System: Linux cher-desktop 5.10.104-tegra #1 SMP PREEMPT Wed Aug 10 20:17:07 PDT 2022 aarch64 aarch64 aarch64 GNU/Linux
+   ✅ ARM processor detected
+
+🌍 Environment Variables:
+   JETSON_MODEL: Not set
+   JETSON_VERSION: Not set
+   TEGRA_CHIP_ID: Not set
+   CUDA_VISIBLE_DEVICES: Not set
+
+🧪 Testing Offline Storage Manager Detection
+==================================================
+🚀 Offline Storage Manager initialized at offline_storage
+   Offline Storage Manager - Is Jetson: True
+   ❌ Error testing offline storage: libopenblas.so.0: cannot open shared object file: No such file or directory
+
+🐳 Docker Environment Check
+==================================================
+   ❌ Not running in Docker container
+   Jetson files in container:
+     ✅ /etc/nv_tegra_release - EXISTS
+     ✅ /proc/device-tree/model - EXISTS
+   ❌ Error checking CUDA in container: libopenblas.so.0: cannot open shared object file: No such file or directory
+
+==================================================
+📊 SUMMARY
+==================================================
+❌ Error in final test: libopenblas.so.0: cannot open shared object file: No such file or directory
+cher@cher-desktop:~/app/offline-rapid-care$ 
+
+
