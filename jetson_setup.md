@@ -281,3 +281,7 @@ The quantized Gemma 3n model is well-suited for Jetson Nano deployment, offering
 - ⚠️ **Limited concurrent users** (single user recommended)
 
 For production use cases requiring faster performance, consider Jetson Xavier NX or cloud deployment. 
+
+
+### Extras
+screen recording in jetson: gst-launch-1.0 ximagesrc num-buffers=100 use-damage=0 ! video/x-raw ! nvvidconv ! 'video/x-raw(memory:NVMM),format=NV12' ! nvv4l2h264enc ! h264parse ! qtmux ! filesink location=a.mp4

@@ -52,12 +52,14 @@ docker run -d \
     --name offline-gemma-jetson \
     --runtime=nvidia \
     --gpus all \
-    -p 5050:5050 \
+    -p 0.0.0.0:5050:5050 \
     -v $(pwd)/models:/workspace/models \
     -v $(pwd)/uploads:/workspace/uploads \
     -v $(pwd)/rapidcare_offline.db:/workspace/rapidcare_offline.db \
     -v $(pwd)/offload:/workspace/offload \
     -v $(pwd)/scripts:/workspace/scripts \
+    -v /etc/nv_tegra_release:/etc/nv_tegra_release:ro \
+    -v /proc/device-tree/model:/proc/device-tree/model:ro \
     --restart unless-stopped \
     offline-gemma-jetson
 
