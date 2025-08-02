@@ -3,10 +3,10 @@
 FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
 
 # Stage 2: Transformers image
-FROM dustynv/transformers:r35.1.1 as transformers-base
+FROM dustynv/transformers:r35.3.1 as transformers-base
 
 # Stage 3: Final application image
-FROM dustynv/transformers:r35.1.1
+FROM dustynv/transformers:r35.3.1
 
 # Set environment variables
 ENV PYTHONPATH=/workspace
@@ -30,7 +30,23 @@ RUN apt-get update && apt-get install -y \
     libxext6 \
     libxrender-dev \
     libgomp1 \
+    wget \
+    build-essential \
     && rm -rf /var/lib/apt/lists/*
+
+# Install newer SQLite for ChromaDB compatibility
+RUN cd /tmp && \
+    wget https://www.sqlite.org/2023/sqlite-autoconf-3420000.tar.gz && \
+    tar -xzf sqlite-autoconf-3420000.tar.gz && \
+    cd sqlite-autoconf-3420000 && \
+    ./configure --prefix=/usr/local && \
+    make && \
+    make install && \
+    cd / && \
+    rm -rf /tmp/sqlite-autoconf-3420000*
+
+# Update library path for new SQLite
+ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 
 # Set working directory
 WORKDIR /workspace
