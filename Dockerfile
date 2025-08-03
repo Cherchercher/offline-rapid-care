@@ -31,6 +31,7 @@ RUN apt-get update && apt-get install -y \
     libxrender-dev \
     libgomp1 \
     wget \
+    curl \
     build-essential \
     zlib1g-dev \
     libbz2-dev \
