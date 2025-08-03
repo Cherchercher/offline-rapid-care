@@ -42,7 +42,7 @@ RUN apt-get update && apt-get install -y \
     liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build and install Python 3.9 from source
+# Build and install Python 3.9 from source (needed for newer transformers)
 RUN cd /tmp && \
     wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz && \
     tar -xzf Python-3.9.18.tgz && \
@@ -77,24 +77,26 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 # Set working directory
 WORKDIR /workspace
 
-# Set pip cache directory for faster builds
-ENV PIP_CACHE_DIR=/root/.cache/pip
+# No pip cache (using --no-cache-dir for fresh installs)
 
 # Copy requirements first for better caching
 COPY requirements.txt .
 
 # Upgrade pip and build tools
-RUN pip3 install --upgrade pip setuptools wheel
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install dependencies using pip cache
-RUN pip3 install --cache-dir=$PIP_CACHE_DIR backports.zoneinfo==0.2.1
-RUN pip3 install --cache-dir=$PIP_CACHE_DIR -r requirements.txt
+# Install PyTorch for Python 3.9 with CUDA support (Jetson compatible)
+RUN pip3 install --no-cache-dir \
+    torch \
+    torchvision \
+    torchaudio \
+    --index-url https://download.pytorch.org/whl/cu118
 
-# Fix numpy compatibility issue with OpenCV
-RUN pip3 install --cache-dir=$PIP_CACHE_DIR "numpy>=1.24.0,<2.0.0"
+# Install all requirements from requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 # Install additional dependencies that might be needed
-RUN pip3 install --cache-dir=$PIP_CACHE_DIR \
+RUN pip3 install --no-cache-dir \
     pyaudio \
     psycopg2-binary \
     opencv-python-headless \

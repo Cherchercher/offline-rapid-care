@@ -185,26 +185,72 @@ class ModelManagerPipeline:
             
             start_time = time.time()
             
+            # For text-only conversations, we need to handle it differently
+            # since the finetuned model is multimodal (image+text)
+            
+            # Extract text from messages
+            text_content = ""
+            for message in messages:
+                if message.get("role") == "user":
+                    content = message.get("content", "")
+                    if isinstance(content, list):
+                        # Handle multimodal content
+                        for item in content:
+                            if isinstance(item, dict) and item.get("type") == "text":
+                                text_content += item.get("text", "") + " "
+                    elif isinstance(content, str):
+                        text_content += content + " "
+            
+            text_content = text_content.strip()
+            print(f"🔊 Extracted text content: {text_content}")
+            
+            # Create a simple text prompt for the model
+            # Since this is a multimodal model, we'll create a text-only conversation
+            text_messages = [
+                {
+                    "role": "user",
+                    "content": text_content
+                }
+            ]
+            
             # Apply chat template
-            input_ids = self.direct_processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt"
+            input_text = self.direct_processor.apply_chat_template(
+                text_messages,
+                add_generation_prompt=True
             )
             
-            # Move to the same device as the model
-            model_dtype = next(self.direct_model.parameters()).dtype
-            input_ids = input_ids.to(self.device, dtype=model_dtype)
-            print(f"🔊 Using model dtype: {model_dtype} on device: {self.device}")
+            # Since this is a multimodal model, it always requires an image
+            # Use a dummy white image for text-only conversations
+            dummy_image = Image.new('RGB', (224, 224), color='white')
+            print("🖼️  Using dummy image for text-only conversation (model requires image)")
             
-            # Generate response
+            # Process with dummy image (same format as your Colab)
+            inputs = self.direct_processor(
+                dummy_image,
+                input_text,
+                add_special_tokens=False,
+                return_tensors="pt"
+            )
+            print("✅ Using dummy image processing for text conversation")
+            
+            # Move to appropriate device (CUDA if available, otherwise CPU)
+            if torch.cuda.is_available():
+                inputs = inputs.to("cuda")
+                print("🚀 Using CUDA for text inference")
+            else:
+                inputs = inputs.to("cpu")
+                print("🚀 Using CPU for text inference")
+            
+            print(f"🔊 Inputs processed, shape: {inputs['input_ids'].shape}")
+            
+            # Generate response (same parameters as your Colab)
             outputs = self.direct_model.generate(
-                **input_ids, 
-                max_new_tokens=256,
-                do_sample=True,
-                temperature=0.7
+                **inputs, 
+                max_new_tokens=512,  # Increased from 256
+                use_cache=True, 
+                temperature=1.0,  # Changed from 0.7
+                top_p=0.95, 
+                top_k=64
             )
             
             # Decode response
