@@ -111,64 +111,30 @@ class ModelManagerPipeline:
                 print(f"❌ Local model not found at {local_model_path}")
                 raise FileNotFoundError(f"Local model not found at {local_model_path}")
             
-            # Load processor and model from local directory
-            self.direct_processor = AutoProcessor.from_pretrained(
-                local_model_path, 
-                trust_remote_code=True
-            )
-            
-            # Load model with GPU optimizations
-            if self.device == "cuda:0" and torch.cuda.is_available():
-                is_jetson = self._is_jetson_device()
-                
-                if is_jetson:
-                    print("🚀 Loading model with Jetson optimizations...")
-                    # Use float16 for Jetson GPU memory efficiency
-                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
-                        local_model_path, 
-                        torch_dtype=torch.float16, 
-                        device_map=self.device,
-                        trust_remote_code=True,
-                        low_cpu_mem_usage=True
+            # Load model with FastVisionModel optimizations (if available)
+            if UNSLOTH_AVAILABLE:
+                print("🚀 Loading model with FastVisionModel optimizations...")
+                try:
+                    # Use FastVisionModel loading WITHOUT 4bit quantization to avoid dtype issues
+                    self.direct_model, self.direct_processor = FastVisionModel.from_pretrained(
+                        local_model_path,
+                        dtype=None,  # Auto detection
+                        token=None,  # No token needed for local model
+                        load_in_4bit=False,  # Disabled to avoid dtype casting issues
+                        use_gradient_checkpointing="unsloth",  # For long context
                     )
-                    print("✅ Model loaded with float16 on Jetson GPU")
-                else:
-                    print("🚀 Loading model with standard GPU optimizations...")
-                    # Use auto dtype for standard GPUs (can handle higher precision)
-                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
-                        local_model_path, 
-                        torch_dtype="auto", 
-                        device_map=self.device,
-                        trust_remote_code=True,
-                        low_cpu_mem_usage=True
-                    )
-                    print("✅ Model loaded with auto dtype on standard GPU")
-            else:
-                # CPU loading
-                print("🚀 Loading model on CPU...")
-                self.direct_model = AutoModelForImageTextToText.from_pretrained(
-                    local_model_path, 
-                    torch_dtype="auto", 
-                    device_map=self.device,
-                    trust_remote_code=True,
-                    low_cpu_mem_usage=True
-                )
-                print("✅ Model loaded on CPU")
-<<<<<<< HEAD
-=======
-            
-            # Try to enable Unsloth FastVisionModel.for_inference() if available
-            try:
-                if UNSLOTH_AVAILABLE and hasattr(self.direct_model, 'for_inference'):
+                    
+                    # Enable FastVisionModel for inference
                     self.direct_model = self.direct_model.for_inference()
-                    print("✅ Unsloth FastVisionModel.for_inference() enabled")
-                elif UNSLOTH_AVAILABLE:
-                    print("⚠️  FastVisionModel.for_inference() not available on this model")
-                else:
-                    print("⚠️  Unsloth not available, using standard model loading")
-            except Exception as e:
-                print(f"⚠️  Could not enable FastVisionModel.for_inference(): {e}")
->>>>>>> 705083c92aed47c52e22676845dd3d6ad655a03f
+                    print("✅ FastVisionModel loaded and enabled for inference!")
+                    
+                except Exception as e:
+                    print(f"⚠️  FastVisionModel loading failed: {e}")
+                    print("🔄 Falling back to standard model loading...")
+                    self._load_standard_model(local_model_path)
+            else:
+                print("⚠️  Unsloth not available, using standard model loading")
+                self._load_standard_model(local_model_path)
             
             self._model_loaded = True
             print("✅ Direct model loaded successfully")
@@ -177,27 +143,24 @@ class ModelManagerPipeline:
             print(f"❌ Failed to load direct model: {e}")
             raise
     
-    def _load_image_from_url(self, url: str) -> Optional[Image.Image]:
+    def load_image_from_url_or_path(self, image_source):
         """Load image from URL or local path"""
         try:
-            print(f"🔊 Loading image from URL/path: {url}")
-            
-            # Check if it's a local file path
-            if os.path.exists(url):
-                img = Image.open(url).convert("RGB")
-                print(f"🔊 Successfully loaded local image: {img.size}")
-                return img
-            
-            # Otherwise treat as URL
-            response = requests.get(url, timeout=15)
-            response.raise_for_status()
-            img = Image.open(BytesIO(response.content)).convert("RGB")
-            print(f"🔊 Successfully loaded image from URL: {img.size}")
-            return img
+            if image_source.startswith(('http://', 'https://')):
+                print(f"📥 Downloading image from URL: {image_source}")
+                response = requests.get(image_source, timeout=10)
+                response.raise_for_status()
+                image = Image.open(BytesIO(response.content)).convert("RGB")
+                print(f"✅ Image downloaded successfully: {image.size}")
+            else:
+                print(f" Loading image from local path: {image_source}")
+                image = Image.open(image_source).convert("RGB")
+                print(f"✅ Image loaded successfully: {image.size}")
+            return image
         except Exception as e:
-            print(f"🔊 Error loading image from URL/path {url}: {e}")
+            print(f"❌ Error loading image: {e}")
             return None
-    
+
     def chat_text(self, messages: List[Dict]) -> Dict:
         """
         Send text-only chat request using direct model loading
@@ -289,7 +252,7 @@ class ModelManagerPipeline:
                 'error': str(e),
                 'mode': 'text-direct'
             }
-    
+
     def chat_image(self, messages: List[Dict]) -> Dict:
         """
         Send image analysis request using direct model loading
@@ -314,36 +277,24 @@ class ModelManagerPipeline:
             
             start_time = time.time()
             
-<<<<<<< HEAD
-            # Apply chat template - let the processor handle images from messages
-            print(f"🔊 Applying chat template with messages")
-            template_start = time.time()
-            input_ids = self.direct_processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt"
-            )
-            template_time = time.time() - template_start
-            print(f"🔊 Chat template applied in {template_time:.2f} seconds")
-            
-            # Move to the same device as the model
-            model_dtype = next(self.direct_model.parameters()).dtype
-            input_ids = input_ids.to(self.device, dtype=model_dtype)
-            print(f"🔊 Using model dtype: {model_dtype} on device: {self.device}")
-=======
             # Extract image and text from messages (compatible with Colab approach)
             image = None
             prompt_text = ""
->>>>>>> 705083c92aed47c52e22676845dd3d6ad655a03f
             
             for msg in messages:
                 if isinstance(msg.get("content"), list):
                     for item in msg["content"]:
                         if isinstance(item, dict):
-                            if item.get("type") == "image" and "image" in item:
-                                image = item["image"]
+                            if item.get("type") == "image":
+                                # Handle both embedded image objects and image paths/URLs
+                                if "image" in item:
+                                    image = item["image"]
+                                elif "path" in item:
+                                    # Load image from path/URL
+                                    image = self.load_image_from_url_or_path(item["path"])
+                                elif "url" in item:
+                                    # Load image from URL
+                                    image = self.load_image_from_url_or_path(item["url"])
                             elif item.get("type") == "text":
                                 prompt_text = item.get("text", "")
             
@@ -377,7 +328,15 @@ class ModelManagerPipeline:
                 input_text,
                 add_special_tokens=False,
                 return_tensors="pt"
-            ).to(self.device)
+            )
+            
+            # Move to appropriate device (CUDA if available, otherwise CPU)
+            if torch.cuda.is_available():
+                inputs = inputs.to("cuda")
+                print("🚀 Using CUDA for inference")
+            else:
+                inputs = inputs.to("cpu")
+                print("🚀 Using CPU for inference")
             
             print(f"🔊 Inputs processed, shape: {inputs['input_ids'].shape}")
             
