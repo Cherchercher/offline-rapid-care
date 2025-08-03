@@ -9,6 +9,7 @@ import base64
 from typing import Dict, List, Optional
 import time
 import os
+import cv2
 from prompts import MEDICAL_TRIAGE_PROMPT
 
 class ModelManagerPipeline:
@@ -355,7 +356,6 @@ class ModelManagerPipeline:
             if not file_exists:
                 print(f"❌ Video file not found: {video_path}")
                 # List contents of the directory
-                import os
                 dir_path = os.path.dirname(video_path)
                 if os.path.exists(dir_path):
                     print(f"   Directory contents: {os.listdir(dir_path)}")
@@ -486,8 +486,6 @@ class ModelManagerPipeline:
             List of PIL Images
         """
         try:
-            import cv2
-            import os
             
             print(f"🔊 Starting video frame extraction:")
             print(f"   Video path: {video_path}")
@@ -679,3 +677,4 @@ def get_pipeline_manager() -> ModelManagerPipeline:
     if _pipeline_manager is None:
         _pipeline_manager = ModelManagerPipeline()
     return _pipeline_manager 
+

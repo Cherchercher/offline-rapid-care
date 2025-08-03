@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 import requests
 import json
 import os
+
 from datetime import datetime
 import uuid
 from typing import Dict
@@ -54,14 +55,14 @@ def index():
 @app.route('/offline.html')
 def offline_page():
     from flask import send_from_directory
-    import os
+    
     templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
     return send_from_directory(templates_dir, 'offline.html')
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     """Serve uploaded files with proper MIME types"""
-    import os
+    
     from flask import send_from_directory, Response
     
     file_path = os.path.join(UPLOADS_DIR, filename)
@@ -523,7 +524,7 @@ def transcribe_voice():
         # Online mode - process normally
         # Save audio temporarily
         import tempfile
-        import os
+        
         
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
             audio_file.save(tmp_file.name)
@@ -1257,7 +1258,7 @@ def analyze_image_file(file, user_role):
     """Analyze an uploaded image file"""
     try:
         # Save image to uploads directory
-        import os
+        
         from PIL import Image
         import numpy as np
         from datetime import datetime
@@ -1317,7 +1318,7 @@ def analyze_video_file(file, user_role):
     try:
         # Save video temporarily in uploads directory
         import tempfile
-        import os
+        
         import time
         
         print(f"🎬 Starting video analysis for file: {file.filename}")
@@ -1456,7 +1457,7 @@ def transcribe_audio_with_direct_model(audio_path, user_role):
     try:
         import speech_recognition as sr
         from pydub import AudioSegment
-        import os
+        
         
         # Convert audio to WAV if needed
         audio = AudioSegment.from_file(audio_path)
