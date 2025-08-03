@@ -62,11 +62,11 @@ COPY requirements.txt .
 # Upgrade pip and build tools
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install PyTorch with CUDA support for standard GPUs
+# Install PyTorch >= 2.1 with CUDA support for standard GPUs
 RUN pip3 install --no-cache-dir \
-    torch \
-    torchvision \
-    torchaudio \
+    torch>=2.1.0 \
+    torchvision>=0.16.0 \
+    torchaudio>=2.1.0 \
     --index-url https://download.pytorch.org/whl/cu118
 
 # Install all requirements from requirements.txt

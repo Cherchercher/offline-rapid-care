@@ -12,9 +12,9 @@ opencv-python-headless==4.8.1.78
 numpy>=1.24.0
 
 # AI/ML dependencies for EC2/Standard GPUs
-torch>=2.0.0
-torchvision>=0.15.0
-torchaudio>=2.0.0
+torch>=2.1.0
+torchvision>=0.16.0
+torchaudio>=2.1.0
 transformers>=4.51.3
 accelerate>=0.24.0
 
