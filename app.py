@@ -1315,13 +1315,15 @@ def analyze_image_file(file, user_role):
 def analyze_video_file(file, user_role):
     """Analyze an uploaded video file using the new API approach"""
     try:
-        # Save video temporarily
+        # Save video temporarily in uploads directory
         import tempfile
         import os
+        import time
         
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-            file.save(tmp_file.name)
-            tmp_path = tmp_file.name
+        # Create temp file in uploads directory to ensure container access
+        timestamp = int(time.time())
+        tmp_path = os.path.join(UPLOADS_DIR, f'temp_video_{timestamp}.mp4')
+        file.save(tmp_path)
         
         # Use the new API approach - same as direct curl call
         messages = [

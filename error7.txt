@@ -1,0 +1,36 @@
+NFO:werkzeug:172.17.0.1 - - [03/Aug/2025 06:26:50] "GET /api/connectivity HTTP/1.1" 200 -
+🔗 API Model Manager: Video analysis request
+   API URL: http://localhost:5001
+   Messages: [
+  {
+    "role": "user",
+    "content": [
+      {
+        "type": "video",
+        "path": "/tmp/tmpce_hocui.mp4"
+      }
+    ]
+  }
+]
+🔍 Checking server health...
+✅ API Model Manager: Server health check passed
+📤 Sending video analysis request to http://localhost:5001/chat/video
+   Payload: {
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "video",
+          "path": "/tmp/tmpce_hocui.mp4"
+        }
+      ]
+    }
+  ]
+}
+INFO:werkzeug:172.17.0.1 - - [03/Aug/2025 06:27:00] "GET /api/connectivity HTTP/1.1" 200 -
+📥 Response status: 200
+📥 Response headers: {'Server': 'Werkzeug/3.0.1 Python/3.9.18', 'Date': 'Sun, 03 Aug 2025 06:27:02 GMT', 'Content-Type': 'application/json', 'Content-Length': '163', 'Connection': 'close'}
+✅ Video analysis successful: {'error': 'No frames extracted from video. Please ensure the video file is valid and in a supported format (MP4, AVI, MOV).', 'mode': 'api-video', 'success': False}
+INFO:werkzeug:172.17.0.1 - - [03/Aug/2025 06:27:02] "POST /api/analyze-media HTTP/1.1" 200 -
+
