@@ -63,6 +63,10 @@ docker run -d \
     -v /etc/nv_tegra_release:/etc/nv_tegra_release:ro \
     -v /proc/device-tree/model:/proc/device-tree/model:ro \
     -v /tmp:/tmp \
+    -v /usr/local/lib/python3.8/dist-packages:/usr/local/lib/python3.9/site-packages:ro \
+    -v /usr/lib/python3/dist-packages:/usr/lib/python3.9/site-packages:ro \
+    -v /usr/local/cuda:/usr/local/cuda:ro \
+    -v /usr/lib/aarch64-linux-gnu:/usr/lib/aarch64-linux-gnu:ro \
     --restart unless-stopped \
     offline-gemma-jetson
 

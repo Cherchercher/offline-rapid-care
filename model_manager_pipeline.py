@@ -1,5 +1,7 @@
+from unsloth import FastVisionModel
 import torch
 from transformers import pipeline, AutoProcessor, AutoModelForImageTextToText
+from torch.optim.lr_scheduler import LRScheduler
 import requests
 from PIL import Image
 from io import BytesIO
@@ -12,14 +14,9 @@ import os
 import cv2
 from prompts import MEDICAL_TRIAGE_PROMPT
 
-# Try to import Unsloth for FastVisionModel
-try:
-    from unsloth import FastVisionModel
-    UNSLOTH_AVAILABLE = True
-    print("✅ Unsloth FastVisionModel available")
-except ImportError:
-    UNSLOTH_AVAILABLE = False
-    print("⚠️  Unsloth not available, using standard model loading")
+# Unsloth disabled for Jetson compatibility
+UNSLOTH_AVAILABLE = False
+print("🔄 Using standard transformers approach (Unsloth disabled for Jetson)")
 
 class ModelManagerPipeline:
     """Model manager using direct model loading for all tasks"""

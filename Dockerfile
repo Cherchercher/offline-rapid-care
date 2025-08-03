@@ -1,6 +1,6 @@
 # Multi-stage Dockerfile for Jetson Xavier
-# Stage 1: Base PyTorch image
-FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
+# Stage 1: Use simple Python base image (mount everything from host)
+FROM python:3.9-slim
 
 # # Stage 2: Transformers image
 # FROM dustynv/transformers:r36.4.2 as transformers-base
@@ -42,23 +42,11 @@ RUN apt-get update && apt-get install -y \
     liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build and install Python 3.9 from source (needed for newer transformers)
-RUN cd /tmp && \
-    wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz && \
-    tar -xzf Python-3.9.18.tgz && \
-    cd Python-3.9.18 && \
-    ./configure --enable-optimizations --with-ensurepip=install --prefix=/usr/local && \
-    make -j$(nproc) && \
-    make altinstall && \
-    cd / && \
-    rm -rf /tmp/Python-3.9.18*
+# Python 3.9 already available in base image
 
-# Create symlinks for python3.9
-RUN ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3 && \
-    ln -sf /usr/local/bin/pip3.9 /usr/local/bin/pip3
-
-# Update PATH to use Python 3.9
-ENV PATH="/usr/local/bin:$PATH"
+# Install PyTorch for Python 3.9 (CPU first, CUDA auto-detected)
+# Skip PyTorch installation - will mount from host
+# PyTorch will be mounted from host system
 
 # Install newer SQLite for ChromaDB compatibility
 RUN cd /tmp && \
@@ -85,12 +73,8 @@ COPY requirements.txt .
 # Upgrade pip and build tools
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install PyTorch for Python 3.9 with CUDA support (Jetson compatible)
-RUN pip3 install --no-cache-dir \
-    torch \
-    torchvision \
-    torchaudio \
-    --index-url https://download.pytorch.org/whl/cu118
+# Install Unsloth (PyTorch is already in base image)
+RUN pip3 install --no-cache-dir "unsloth @ git+https://github.com/unslothai/unsloth.git"
 
 # Install all requirements from requirements.txt
 RUN pip3 install --no-cache-dir -r requirements.txt
