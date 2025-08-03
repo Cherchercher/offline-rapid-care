@@ -25,16 +25,16 @@ class ModelManagerPipeline:
         """
         self.model_path = model_path
         
-        # Auto-detect device for Jetson
+        # Auto-detect device for any GPU
         if device is None:
             if torch.cuda.is_available():
-                # Check if it's a Jetson device
-                if os.path.exists("/etc/nv_tegra_release"):
+                # Check if it's a Jetson device (multiple indicators)
+                is_jetson = self._is_jetson_device()
+                if is_jetson:
                     print("🚀 Detected Jetson device, using CUDA")
-                    self.device = "cuda:0"
                 else:
-                    print("🚀 Detected CUDA device, using GPU")
-                    self.device = "cuda:0"
+                    print("🚀 Detected standard GPU device, using CUDA")
+                self.device = "cuda:0"
             else:
                 print("🚀 No CUDA available, using CPU")
                 self.device = "cpu"
@@ -43,9 +43,48 @@ class ModelManagerPipeline:
             
         print(f"🎯 Using device: {self.device}")
         
+        # Print device capabilities
+        if self.device == "cuda:0" and torch.cuda.is_available():
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            device_type = "Jetson" if self._is_jetson_device() else "Standard GPU"
+            print(f"📊 GPU: {gpu_name} ({gpu_memory:.1f} GB) - {device_type}")
+        
         self.direct_model = None
         self.direct_processor = None
         self._model_loaded = False
+        
+        # GPU memory optimization for all CUDA devices
+        if self.device == "cuda:0" and torch.cuda.is_available():
+            print("🚀 Setting up GPU optimizations...")
+            
+            # Check if it's Jetson
+            is_jetson = self._is_jetson_device()
+            if is_jetson:
+                print("   🎯 Jetson device detected - using specialized optimizations")
+                # Jetson-specific memory fraction (more conservative)
+                torch.cuda.set_per_process_memory_fraction(0.8)
+            else:
+                print("   🎯 Standard GPU device detected")
+                # Standard GPU memory fraction
+                torch.cuda.set_per_process_memory_fraction(0.9)
+            
+            # Enable memory efficient attention if available
+            try:
+                torch.backends.cuda.enable_flash_sdp(True)
+                print("   ✅ Flash attention enabled")
+            except:
+                print("   ⚠️  Flash attention not available")
+            
+            # Clear GPU cache
+            torch.cuda.empty_cache()
+            print("   ✅ GPU memory cache cleared")
+            
+            # Print GPU info
+            gpu_name = torch.cuda.get_device_name(0)
+            gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
+            print(f"   📊 GPU: {gpu_name} ({gpu_memory:.1f} GB)")
+            print(f"   🎯 Device type: {'Jetson' if is_jetson else 'Standard GPU'}")
         
     def _load_direct_model(self):
         """Load model directly using transformers (lazily on first use)"""
@@ -69,14 +108,43 @@ class ModelManagerPipeline:
                 trust_remote_code=True
             )
             
-            # Load model with auto dtype
-            self.direct_model = AutoModelForImageTextToText.from_pretrained(
-                local_model_path, 
-                torch_dtype="auto", 
-                device_map=self.device,
-                trust_remote_code=True,
-                low_cpu_mem_usage=True
-            )
+            # Load model with GPU optimizations
+            if self.device == "cuda:0" and torch.cuda.is_available():
+                is_jetson = self._is_jetson_device()
+                
+                if is_jetson:
+                    print("🚀 Loading model with Jetson optimizations...")
+                    # Use float16 for Jetson GPU memory efficiency
+                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                        local_model_path, 
+                        torch_dtype=torch.float16, 
+                        device_map=self.device,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True
+                    )
+                    print("✅ Model loaded with float16 on Jetson GPU")
+                else:
+                    print("🚀 Loading model with standard GPU optimizations...")
+                    # Use auto dtype for standard GPUs (can handle higher precision)
+                    self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                        local_model_path, 
+                        torch_dtype="auto", 
+                        device_map=self.device,
+                        trust_remote_code=True,
+                        low_cpu_mem_usage=True
+                    )
+                    print("✅ Model loaded with auto dtype on standard GPU")
+            else:
+                # CPU loading
+                print("🚀 Loading model on CPU...")
+                self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                    local_model_path, 
+                    torch_dtype="auto", 
+                    device_map=self.device,
+                    trust_remote_code=True,
+                    low_cpu_mem_usage=True
+                )
+                print("✅ Model loaded on CPU")
             
             self._model_loaded = True
             print("✅ Direct model loaded successfully")
@@ -139,10 +207,10 @@ class ModelManagerPipeline:
                 return_tensors="pt"
             )
             
-            # Move to CPU with the same dtype as the model
+            # Move to the same device as the model
             model_dtype = next(self.direct_model.parameters()).dtype
-            input_ids = input_ids.to("cpu", dtype=model_dtype)
-            print(f"🔊 Using model dtype: {model_dtype}")
+            input_ids = input_ids.to(self.device, dtype=model_dtype)
+            print(f"🔊 Using model dtype: {model_dtype} on device: {self.device}")
             
             # Generate response
             outputs = self.direct_model.generate(
@@ -235,10 +303,10 @@ class ModelManagerPipeline:
             template_time = time.time() - template_start
             print(f"🔊 Chat template applied in {template_time:.2f} seconds")
             
-            # Move to CPU with the same dtype as the model
+            # Move to the same device as the model
             model_dtype = next(self.direct_model.parameters()).dtype
-            input_ids = input_ids.to("cpu", dtype=model_dtype)
-            print(f"🔊 Using model dtype: {model_dtype}")
+            input_ids = input_ids.to(self.device, dtype=model_dtype)
+            print(f"🔊 Using model dtype: {model_dtype} on device: {self.device}")
             
             # --- ADDED: Input tensor validation ---
             for k, v in input_ids.items():
@@ -598,10 +666,10 @@ class ModelManagerPipeline:
                 return_tensors="pt"
             )
             
-            # Move to CPU with the same dtype as the model
+            # Move to the same device as the model
             model_dtype = next(self.direct_model.parameters()).dtype
-            input_ids = input_ids.to("cpu", dtype=model_dtype)
-            print(f"🔊 Using model dtype: {model_dtype}")
+            input_ids = input_ids.to(self.device, dtype=model_dtype)
+            print(f"🔊 Using model dtype: {model_dtype} on device: {self.device}")
             
             # Generate response
             outputs = self.direct_model.generate(
@@ -659,7 +727,7 @@ class ModelManagerPipeline:
     
     def get_status(self) -> Dict:
         """Get current model status"""
-        return {
+        status = {
             'mode': 'direct',
             'model_path': self.model_path,
             'device': self.device,
@@ -667,6 +735,39 @@ class ModelManagerPipeline:
             'direct_model_loaded': self.direct_model is not None,
             'direct_processor_loaded': self.direct_processor is not None
         }
+        
+        # Add GPU info if available
+        if torch.cuda.is_available():
+            status['gpu_name'] = torch.cuda.get_device_name(0)
+            status['gpu_memory_total'] = torch.cuda.get_device_properties(0).total_memory / 1024**3  # GB
+            status['gpu_memory_allocated'] = torch.cuda.memory_allocated(0) / 1024**3  # GB
+            status['gpu_memory_cached'] = torch.cuda.memory_reserved(0) / 1024**3  # GB
+            status['is_jetson'] = os.path.exists("/etc/nv_tegra_release")
+        
+        return status
+
+    def _is_jetson_device(self) -> bool:
+        """Robust Jetson device detection (multiple indicators)"""
+        try:
+            jetson_indicators = [
+                "/etc/nv_tegra_release",
+                "/proc/device-tree/model",
+                "/sys/module/tegra_fuse/parameters/tegra_chip_id"
+            ]
+            for indicator in jetson_indicators:
+                if os.path.exists(indicator):
+                    return True
+            # Check GPU name for Jetson/Tegra/Xavier
+            if torch.cuda.is_available():
+                try:
+                    device_name = torch.cuda.get_device_name(0).lower()
+                    if any(x in device_name for x in ["tegra", "jetson", "xavier"]):
+                        return True
+                except Exception:
+                    pass
+            return False
+        except Exception:
+            return False
 
 # Global instance
 _pipeline_manager = None
