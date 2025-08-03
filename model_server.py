@@ -74,6 +74,7 @@ def chat_image():
 def chat_video():
     """Video analysis endpoint"""
     try:
+        print(f"🎬 === VIDEO ANALYSIS REQUEST START ===")
         data = request.json
         messages = data.get('messages', [])
         
@@ -92,6 +93,15 @@ def chat_video():
         
         print(f"   Video path: {video_path}")
         
+        # Check if file exists before calling model manager
+        import os
+        if video_path:
+            print(f"   File exists check: {os.path.exists(video_path)}")
+            if os.path.exists(video_path):
+                print(f"   File size: {os.path.getsize(video_path)} bytes")
+            else:
+                print(f"   ❌ File does not exist!")
+        
         # Use model manager for video request
         print(f"📤 Sending video request to model manager...")
         result = model_manager.chat_video(messages)
@@ -99,6 +109,7 @@ def chat_video():
         print(f"   Success: {result.get('success', 'N/A')}")
         print(f"   Error: {result.get('error', 'N/A')}")
         print(f"   Mode: {result.get('mode', 'N/A')}")
+        print(f"🎬 === VIDEO ANALYSIS REQUEST END ===")
         
         return jsonify(result)
         
