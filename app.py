@@ -1315,10 +1315,12 @@ def analyze_image_file(file, user_role):
 def analyze_video_file(file, user_role):
     """Analyze an uploaded video file using the new API approach"""
     try:
-        # Save video temporarily
+        # Save video temporarily in uploads directory
         import tempfile
         import os
+        import time
         
+        # Save video temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
             file.save(tmp_file.name)
             tmp_path = tmp_file.name
