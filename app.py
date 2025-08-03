@@ -1335,6 +1335,11 @@ def analyze_video_file(file, user_role):
         print(f"   Temporary file exists: {os.path.exists(tmp_path)}")
         print(f"   Absolute path: {os.path.abspath(tmp_path)}")
         
+        # Small delay to ensure file is fully written and accessible
+        import time
+        time.sleep(1)
+        print(f"⏳ Waited 1 second, file still exists: {os.path.exists(tmp_path)}")
+        
         # Use the new API approach - same as direct curl call
         messages = [
             {
@@ -1348,15 +1353,18 @@ def analyze_video_file(file, user_role):
         # Use the model manager's video endpoint
         result = model_manager.chat_video(messages)
         
-        # Clean up
+        # Clean up after processing is complete
         try:
             os.unlink(tmp_path)
-        except:
-            pass
+            print(f"🧹 Cleaned up temporary file: {tmp_path}")
+        except Exception as cleanup_error:
+            print(f"⚠️  Failed to cleanup temporary file: {cleanup_error}")
         
         if result['success']:
+            print(f"✅ Video analysis successful")
             return result['response']
         else:
+            print(f"❌ Video analysis failed: {result.get('error', 'Unknown error')}")
             return f"Error analyzing video: {result.get('error', 'Unknown error')}"
         
     except Exception as e:
