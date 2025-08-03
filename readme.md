@@ -10,6 +10,35 @@ Enter **RapidCare** — a groundbreaking solution designed to transform emergenc
 
 This cutting-edge app is designed to operate fully offline on mobile devices, including Google Edge AI, Jetson devices, and web browsers, ensuring optimal performance regardless of connectivity. With intelligent medical triage features like video-based assessments, real-time vitals transcription, and patient reunification capabilities, RapidCare serves as a vital assistant to those working on the frontlines and those desperately seeking information.
 
+## 🐳 Quick Start (Docker)
+
+### **For Jetson Devices:**
+```bash
+# Clone the repository
+git clone <your-repo>
+cd offline-gemma
+
+# Build and run with Docker (5-minute setup)
+./build_and_run.sh
+
+# Access the application
+# Web Interface: http://localhost:5050
+# Model API: http://localhost:5001
+# Upload Server: http://localhost:11435
+```
+
+### **For Other Platforms:**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Download models
+python scripts/download_gemma_models.py --model 4b
+
+# Run the application
+python app.py
+```
+
 ## 🏗️ Architecture Overview
 
 ### **System Architecture**
@@ -60,33 +89,57 @@ This cutting-edge app is designed to operate fully offline on mobile devices, in
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### **Deployment Architecture**
+### **Docker Deployment Architecture**
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                    Deployment Options                           │
+│                    Docker Container Architecture               │
 ├─────────────────────────────────────────────────────────────────┤
 │                                                                 │
-│  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────┐ │
-│  │   AWS EC2       │    │   Google Edge   │    │   Jetson    │ │
-│  │   (CPU Only)    │    │      AI         │    │   Device    │ │
-│  │                 │    │                 │    │             │ │
-│  │ • r6i.xlarge   │    │ • Edge Device   │    │ • Xavier NX │ │
-│  │ • 2B Model     │    │ • 4B Model      │    │ • 4B Model  │ │
-│  │ • Web Access   │    │ • Offline Cap.  │    │ • Offline   │ │
-│  │ • 500MB Limit  │    │ • Local Storage │    │ • Local DB  │ │
-│  └─────────────────┘    └─────────────────┘    └─────────────┘ │
+│  ┌─────────────────────────────────────────────────────────────┐ │
+│  │              Docker Container (offline-gemma-jetson)      │ │
+│  │                                                             │ │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │ │
+│  │  │   Flask     │ │   Model     │ │   Upload Server     │   │ │
+│  │  │   App       │ │   Server    │ │                     │   │ │
+│  │  │ (Port 5050) │ │ (Port 5001) │ │   (Port 11435)      │   │ │
+│  │  └─────────────┘ └─────────────┘ └─────────────────────┘   │ │
+│  │                                                             │ │
+│  │  ┌─────────────────────────────────────────────────────────┐ │ │
+│  │  │              AI Models (Gemma 3n)                      │ │ │
+│  │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ │ │ │
+│  │  │  │   4B Model  │ │   2B Model  │ │   Dynamic       │ │ │ │
+│  │  │  │  (Primary)  │ │  (Fallback) │ │   Selection     │ │ │ │
+│  │  │  └─────────────┘ └─────────────┘ └─────────────────┘ │ │ │
+│  │  └─────────────────────────────────────────────────────────┘ │ │
+│  │                                                             │ │
+│  │  ┌─────────────────────────────────────────────────────────┐ │ │
+│  │  │              Storage Layer                              │ │ │
+│  │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────┐ │ │ │
+│  │  │  │   SQLite    │ │   Uploads   │ │   Offload       │ │ │ │
+│  │  │  │  Database   │ │   Directory │ │   Directory     │ │ │ │
+│  │  │  └─────────────┘ └─────────────┘ └─────────────────┘ │ │ │
+│  │  └─────────────────────────────────────────────────────────┘ │ │
+│  └─────────────────────────────────────────────────────────────┘ │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐ │
-│  │              Production Deployment                          │ │
+│  │              Volume Mounts                                 │ │
 │  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │ │
-│  │  │   Nginx     │ │   Flask     │ │     Model Server    │   │ │
-│  │  │   Proxy     │ │   App       │ │     (GPU/CPU)       │   │ │
-│  │  │  (Port 443) │ │ (Port 5050) │ │    (Port 5001)      │   │ │
+│  │  │   Models    │ │   Uploads   │ │   Database          │   │ │
+│  │  │   (Host)    │ │   (Host)    │ │   (Host)            │   │ │
 │  │  └─────────────┘ └─────────────┘ └─────────────────────┘   │ │
 │  └─────────────────────────────────────────────────────────────┘ │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### **Deployment Options**
+
+| Platform | Setup Time | Model | Performance | Offline Cap. |
+|----------|------------|-------|-------------|--------------|
+| **Jetson (Docker)** | 5 minutes | 4B | High | ✅ Full |
+| **Google Edge AI** | 10 minutes | 4B | Medium | ✅ Full |
+| **AWS EC2** | 15 minutes | 2B | Medium | ❌ Limited |
+| **Local Desktop** | 20 minutes | 4B | High | ✅ Full |
 
 ### **Data Flow Architecture**
 
@@ -159,6 +212,12 @@ The fine-tuned model processes medical images in real-time, providing structured
 #### **On-Device AI Processing**
 With Google Edge AI and Jetson devices, all critical tasks are processed locally, ensuring rapid and reliable responses even in the most chaotic environments. When there's no internet connectivity, data is first stored in Jetson device. When internet comes back, Jetson syncs the data in storage to the cloud.
 
+#### **Multi-Service Architecture**
+RapidCare runs as three coordinated services:
+- **Flask App** (port 5050): Main web interface and API
+- **Model Server** (port 5001): AI model inference and processing
+- **Upload Server** (port 11435): File upload and storage management
+
 ## 🎯 Impact
 
 With RapidCare, emergency responders and families can navigate the chaos of mass casualty events with increased efficiency, improved coordination, and ultimately, better outcomes for those in need of urgent medical care.
@@ -176,6 +235,59 @@ RapidCare supports multiple roles to ensure comprehensive emergency response:
 - **TRANSFER_AGENT**: Patient transfer management
 - **LOGISTICS**: Supply and resource management
 - **MEDICAL_ASSISTANT**: Clinical support and documentation
+
+## 🐳 Docker Management
+
+### **Essential Commands**
+```bash
+# Build and run
+./build_and_run.sh
+
+# View logs
+docker logs -f offline-gemma-jetson
+
+# Stop container
+docker stop offline-gemma-jetson
+
+# Restart container
+docker restart offline-gemma-jetson
+
+# Enter container shell
+docker exec -it offline-gemma-jetson bash
+
+# Check container status
+docker ps
+```
+
+### **Service-Specific Logs**
+```bash
+# Model server logs
+./scripts/view_model_logs.sh
+
+# Flask app logs
+./scripts/view_flask_logs.sh
+
+# Upload server logs
+./scripts/view_upload_logs.sh
+
+# All logs with color coding
+./scripts/view_all_logs.sh
+```
+
+### **Troubleshooting**
+```bash
+# Check if all services are running
+docker exec offline-gemma-jetson ps aux | grep python
+
+# Test model server health
+curl http://localhost:5001/health
+
+# Check GPU access
+docker exec offline-gemma-jetson nvidia-smi
+
+# Monitor resource usage
+docker stats offline-gemma-jetson
+```
 
 ## 🏆 Prize Alignment
 
