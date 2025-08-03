@@ -3,10 +3,10 @@
 FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
 
 # Stage 2: Transformers image
-FROM dustynv/transformers:r35.3.1 as transformers-base
+FROM dustynv/transformers:r36.4.2 as transformers-base
 
 # Stage 3: Final application image
-FROM dustynv/transformers:r35.3.1
+FROM dustynv/transformers:r36.4.2
 
 # Set environment variables
 ENV PYTHONPATH=/workspace
@@ -56,6 +56,9 @@ COPY requirements.txt .
 
 # Install Python dependencies
 RUN pip3 install --no-cache-dir -r requirements.txt
+
+# Force install latest transformers for Gemma 3n compatibility
+RUN pip3 install --no-cache-dir --upgrade transformers>=4.50.0
 
 # Install additional dependencies that might be needed
 RUN pip3 install --no-cache-dir \
