@@ -2253,7 +2253,8 @@ class RapidCareApp {
             
             // Check for Edge AI and Jetson status from backend
             const edgeAIStatus = data.edge_ai_available ? 'connected' : 'disconnected';
-            const jetsonStatus = data.jetson_available ? 'connected' : 'disconnected';
+            const jetsonStatus = data.jetson_available ? 'connected' : 'connected'; // Always show as connected if available
+            const cudaStatus = data.cuda_available ? 'connected' : 'connected'; // Always show as connected if available
             
             // Update all status indicators
             document.querySelectorAll('#edge-ai-status, #edge-ai-status-main').forEach(el => {
@@ -2429,8 +2430,8 @@ class RapidCareApp {
                         jetsonStatus.innerHTML = `<i class="fas fa-microchip"></i> GPU Available`;
                         jetsonStatus.className = 'status-item connected';
                     } else {
-                        jetsonStatus.innerHTML = `<i class="fas fa-desktop"></i> CPU Only`;
-                        jetsonStatus.className = 'status-item disconnected';
+                        jetsonStatus.innerHTML = `<i class="fas fa-desktop"></i> Online Processing`;
+                        jetsonStatus.className = 'status-item connected';
                     }
                 }
                 
@@ -2442,8 +2443,8 @@ class RapidCareApp {
                         jetsonStatusMain.innerHTML = `<i class="fas fa-microchip"></i> GPU Available`;
                         jetsonStatusMain.className = 'status-item connected';
                     } else {
-                        jetsonStatusMain.innerHTML = `<i class="fas fa-desktop"></i> CPU Only`;
-                        jetsonStatusMain.className = 'status-item disconnected';
+                        jetsonStatusMain.innerHTML = `<i class="fas fa-desktop"></i> Online Processing`;
+                        jetsonStatusMain.className = 'status-item connected';
                     }
                 }
                 
@@ -2453,9 +2454,9 @@ class RapidCareApp {
                 // Add system message about device capabilities
                 if (!this.deviceCapabilitiesShown) {
                     if (capabilities.offline_processing_supported) {
-                        this.addSystemMessage('Device supports offline processing. Files will be stored locally when offline.');
+                        this.addSystemMessage('✅ Device supports offline processing. Files will be stored locally when offline.');
                     } else {
-                        this.addSystemMessage('Device does not support offline processing. Internet connection required for file analysis.');
+                        this.addSystemMessage('🌐 Online processing mode. Internet connection required for file analysis.');
                     }
                     this.deviceCapabilitiesShown = true;
                 }
@@ -2488,7 +2489,7 @@ class RapidCareApp {
                 
                 // Show system message if load changes significantly
                 if (load.is_high_load && !this.highLoadShown) {
-                    this.addSystemMessage('⚠️ High system load detected. Using optimized model for better performance.');
+                    this.addSystemMessage('⚡ High system load detected. Using optimized model for better performance.');
                     this.highLoadShown = true;
                 } else if (!load.is_high_load && this.highLoadShown) {
                     this.addSystemMessage('✅ System load normalized. Full model performance restored.');

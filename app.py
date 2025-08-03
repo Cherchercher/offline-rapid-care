@@ -1578,25 +1578,19 @@ def status():
         except Exception as e:
             vector_status['error'] = str(e)
     
-    # Check Edge AI and Jetson availability
+    # Get device capabilities for status
+    try:
+        capabilities = offline_storage.get_device_capabilities()
+        jetson_available = capabilities.get('is_jetson', False)
+        cuda_available = capabilities.get('has_cuda', False)
+        offline_processing = capabilities.get('offline_processing_supported', False)
+    except:
+        jetson_available = False
+        cuda_available = False
+        offline_processing = False
+    
+    # Edge AI is not available in this setup
     edge_ai_available = False
-    jetson_available = False
-    
-    try:
-        # Check if Edge AI is available
-        import requests
-        response = requests.get(f"{EDGE_AI_URL}/health", timeout=3)
-        edge_ai_available = response.status_code == 200
-    except:
-        pass
-    
-    try:
-        # Check if Jetson is available
-        import requests
-        response = requests.get(f"{JETSON_URL}/health", timeout=3)
-        jetson_available = response.status_code == 200
-    except:
-        pass
     
     return jsonify({
         'model_status': model_status,
@@ -1604,6 +1598,8 @@ def status():
         'vector_search': vector_status,
         'edge_ai_available': edge_ai_available,
         'jetson_available': jetson_available,
+        'cuda_available': cuda_available,
+        'offline_processing': offline_processing,
         'timestamp': datetime.now().isoformat()
     })
 
