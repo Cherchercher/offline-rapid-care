@@ -359,7 +359,7 @@ class ModelManagerPipeline:
             if not frames:
                 print(f"❌ No frames extracted from video: {video_path}")
                 # Try to get more info about the video file
-                import os
+
                 if os.path.exists(video_path):
                     print(f"   File size: {os.path.getsize(video_path)} bytes")
                     # Try to check if it's a valid video file
