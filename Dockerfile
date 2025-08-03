@@ -2,11 +2,11 @@
 # Stage 1: Base PyTorch image
 FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
 
-# Stage 2: Transformers image
-FROM dustynv/transformers:r36.4.2 as transformers-base
+# # Stage 2: Transformers image
+# FROM dustynv/transformers:r36.4.2 as transformers-base
 
-# Stage 3: Final application image
-FROM dustynv/transformers:r36.4.2
+# # Stage 3: Final application image
+# FROM dustynv/transformers:r36.4.2
 
 # Set environment variables
 ENV PYTHONPATH=/workspace
@@ -32,7 +32,32 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     wget \
     build-essential \
+    zlib1g-dev \
+    libbz2-dev \
+    libreadline-dev \
+    libsqlite3-dev \
+    libssl-dev \
+    libffi-dev \
+    liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
+
+# Build and install Python 3.9 from source
+RUN cd /tmp && \
+    wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz && \
+    tar -xzf Python-3.9.18.tgz && \
+    cd Python-3.9.18 && \
+    ./configure --enable-optimizations --with-ensurepip=install --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd / && \
+    rm -rf /tmp/Python-3.9.18*
+
+# Create symlinks for python3.9
+RUN ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3 && \
+    ln -sf /usr/local/bin/pip3.9 /usr/local/bin/pip3
+
+# Update PATH to use Python 3.9
+ENV PATH="/usr/local/bin:$PATH"
 
 # Install newer SQLite for ChromaDB compatibility
 RUN cd /tmp && \
@@ -54,11 +79,10 @@ WORKDIR /workspace
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies
+# Install Python dependencies with better error handling
+RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
+RUN pip3 install --no-cache-dir backports.zoneinfo==0.2.1
 RUN pip3 install --no-cache-dir -r requirements.txt
-
-# Force install latest transformers for Gemma 3n compatibility
-RUN pip3 install --no-cache-dir --upgrade transformers>=4.50.0
 
 # Install additional dependencies that might be needed
 RUN pip3 install --no-cache-dir \

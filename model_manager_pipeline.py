@@ -357,9 +357,26 @@ class ModelManagerPipeline:
             frames = self._extract_video_frames(video_path)
             
             if not frames:
+                print(f"❌ No frames extracted from video: {video_path}")
+                # Try to get more info about the video file
+                if os.path.exists(video_path):
+                    print(f"   File size: {os.path.getsize(video_path)} bytes")
+                    # Try to check if it's a valid video file
+                    import subprocess
+                    try:
+                        result = subprocess.run(['ffprobe', '-v', 'quiet', '-print_format', 'json', '-show_format', '-show_streams', video_path], capture_output=True, text=True)
+                        if result.returncode == 0:
+                            print(f"   Video file is valid according to ffprobe")
+                        else:
+                            print(f"   Video file may be corrupted or unsupported format")
+                    except:
+                        print(f"   Could not check video format with ffprobe")
+                else:
+                    print(f"   Video file does not exist")
+                
                 return {
                     'success': False,
-                    'error': 'No frames extracted from video',
+                    'error': 'No frames extracted from video. Please ensure the video file is valid and in a supported format (MP4, AVI, MOV).',
                     'mode': 'video-direct'
                 }
             
@@ -452,20 +469,41 @@ class ModelManagerPipeline:
         """
         try:
             import cv2
+            import os
+            
+            print(f"🔊 Starting video frame extraction:")
+            print(f"   Video path: {video_path}")
+            print(f"   File exists: {os.path.exists(video_path)}")
+            print(f"   File size: {os.path.getsize(video_path) if os.path.exists(video_path) else 'N/A'} bytes")
             
             # Open video file
             cap = cv2.VideoCapture(video_path)
             
             if not cap.isOpened():
                 print(f"❌ Could not open video file: {video_path}")
+                print(f"   Trying to check video format...")
+                # Try to get more info about the file
+                import subprocess
+                try:
+                    result = subprocess.run(['file', video_path], capture_output=True, text=True)
+                    print(f"   File type: {result.stdout.strip()}")
+                except:
+                    print(f"   Could not determine file type")
                 return []
             
             # Get video properties
             total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             fps = cap.get(cv2.CAP_PROP_FPS)
             duration = total_frames / fps if fps > 0 else 0
+            width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
             
-            print(f"🔊 Video info: {total_frames} frames, {fps:.2f} fps, {duration:.2f}s duration")
+            print(f"🔊 Video info: {total_frames} frames, {fps:.2f} fps, {duration:.2f}s duration, {width}x{height}")
+            
+            if total_frames <= 0:
+                print(f"❌ Invalid video: {total_frames} frames")
+                cap.release()
+                return []
             
             # Calculate frame intervals to extract
             if total_frames <= max_frames:
@@ -474,6 +512,8 @@ class ModelManagerPipeline:
                 # Extract frames evenly distributed throughout the video
                 step = total_frames // max_frames
                 frame_indices = [i * step for i in range(max_frames)]
+            
+            print(f"🔊 Will extract frames at indices: {frame_indices}")
             
             frames = []
             for frame_idx in frame_indices:
@@ -504,7 +544,9 @@ class ModelManagerPipeline:
             print("❌ OpenCV not available. Install with: pip install opencv-python")
             return []
         except Exception as e:
+            import traceback
             print(f"❌ Error extracting video frames: {e}")
+            print(f"❌ Full traceback: {traceback.format_exc()}")
             return []
     
     def chat_audio(self, messages: List[Dict]) -> Dict:
