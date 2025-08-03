@@ -12,21 +12,15 @@ import os
 import cv2
 from prompts import MEDICAL_TRIAGE_PROMPT
 
-# Try to import Unsloth for FastVisionModel
-try:
-    from unsloth import FastVisionModel
-    UNSLOTH_AVAILABLE = True
-    print("✅ Unsloth FastVisionModel available")
-except ImportError:
-    UNSLOTH_AVAILABLE = False
-    print("⚠️  Unsloth not available, using standard model loading")
+# Standard transformers approach (no Unsloth)
+print("🔧 Using standard transformers approach")
 
 class ModelManagerPipeline:
-    """Model manager using direct model loading for all tasks"""
+    """Model manager using standard transformers for all tasks"""
     
     def __init__(self, model_path: str = "./models/gemma3n-4b", device: str = None):
         """
-        Initialize direct model manager
+        Initialize standard model manager
         
         Args:
             model_path: Path to local model or Hugging Face model name
@@ -37,12 +31,7 @@ class ModelManagerPipeline:
         # Auto-detect device for any GPU
         if device is None:
             if torch.cuda.is_available():
-                # Check if it's a Jetson device (multiple indicators)
-                is_jetson = self._is_jetson_device()
-                if is_jetson:
-                    print("🚀 Detected Jetson device, using CUDA")
-                else:
-                    print("🚀 Detected standard GPU device, using CUDA")
+                print("🚀 Detected GPU device, using CUDA")
                 self.device = "cuda:0"
             else:
                 print("🚀 No CUDA available, using CPU")
@@ -56,8 +45,7 @@ class ModelManagerPipeline:
         if self.device == "cuda:0" and torch.cuda.is_available():
             gpu_name = torch.cuda.get_device_name(0)
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-            device_type = "Jetson" if self._is_jetson_device() else "Standard GPU"
-            print(f"📊 GPU: {gpu_name} ({gpu_memory:.1f} GB) - {device_type}")
+            print(f"📊 GPU: {gpu_name} ({gpu_memory:.1f} GB)")
         
         self.direct_model = None
         self.direct_processor = None
@@ -67,16 +55,8 @@ class ModelManagerPipeline:
         if self.device == "cuda:0" and torch.cuda.is_available():
             print("🚀 Setting up GPU optimizations...")
             
-            # Check if it's Jetson
-            is_jetson = self._is_jetson_device()
-            if is_jetson:
-                print("   🎯 Jetson device detected - using specialized optimizations")
-                # Jetson-specific memory fraction (more conservative)
-                torch.cuda.set_per_process_memory_fraction(0.8)
-            else:
-                print("   🎯 Standard GPU device detected")
-                # Standard GPU memory fraction
-                torch.cuda.set_per_process_memory_fraction(0.9)
+            # Standard GPU memory fraction
+            torch.cuda.set_per_process_memory_fraction(0.9)
             
             # Enable memory efficient attention if available
             try:
@@ -93,7 +73,7 @@ class ModelManagerPipeline:
             gpu_name = torch.cuda.get_device_name(0)
             gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
             print(f"   📊 GPU: {gpu_name} ({gpu_memory:.1f} GB)")
-            print(f"   🎯 Device type: {'Jetson' if is_jetson else 'Standard GPU'}")
+            print(f"   🎯 Device type: Standard GPU")
         
     def _load_direct_model(self):
         """Load model directly using transformers (lazily on first use)"""
@@ -112,32 +92,21 @@ class ModelManagerPipeline:
                 raise FileNotFoundError(f"Local model not found at {local_model_path}")
             
             # Load model with FastVisionModel optimizations (if available)
-            if UNSLOTH_AVAILABLE:
-                print("🚀 Loading model with FastVisionModel optimizations...")
-                try:
-                    # Use FastVisionModel loading WITHOUT 4bit quantization to avoid dtype issues
-                    self.direct_model, self.direct_processor = FastVisionModel.from_pretrained(
-                        local_model_path,
-                        dtype=None,  # Auto detection
-                        token=None,  # No token needed for local model
-                        load_in_4bit=False,  # Disabled to avoid dtype casting issues
-                        use_gradient_checkpointing="unsloth",  # For long context
-                    )
-                    
-                    # Enable FastVisionModel for inference
-                    self.direct_model = self.direct_model.for_inference()
-                    print("✅ FastVisionModel loaded and enabled for inference!")
-                    
-                except Exception as e:
-                    print(f"⚠️  FastVisionModel loading failed: {e}")
-                    print("🔄 Falling back to standard model loading...")
-                    self._load_standard_model(local_model_path)
-            else:
-                print("⚠️  Unsloth not available, using standard model loading")
-                self._load_standard_model(local_model_path)
+            # This part is now handled by the standard transformers pipeline
+            # We'll just load the model and processor
+            self.direct_model = AutoModelForImageTextToText.from_pretrained(
+                local_model_path,
+                torch_dtype=torch.float16 if self.device == "cuda:0" and torch.cuda.is_available() else torch.float32
+            )
+            self.direct_processor = AutoProcessor.from_pretrained(
+                local_model_path
+            )
             
-            self._model_loaded = True
-            print("✅ Direct model loaded successfully")
+            # Move model to device
+            self.direct_model = self.direct_model.to(self.device)
+            self.direct_processor = self.direct_processor.to(self.device)
+            
+            print(f"✅ Direct model loaded successfully")
             
         except Exception as e:
             print(f"❌ Failed to load direct model: {e}")

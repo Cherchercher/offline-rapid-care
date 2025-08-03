@@ -9,12 +9,14 @@ psycopg[binary]>=3.1.0
 # Image and video processing - essential only
 Pillow>=10.0.0
 opencv-python-headless==4.8.1.78
-numpy>=1.24.0,<2.0.0
+numpy>=1.24.0
 
-# AI/ML dependencies for Jetson (PyTorch is in base image)
+# AI/ML dependencies for EC2/Standard GPUs
+torch>=2.0.0
+torchvision>=0.15.0
+torchaudio>=2.0.0
 transformers>=4.51.3
 accelerate>=0.24.0
-unsloth>=2024.1
 
 # Audio processing - only what's actually used
 SpeechRecognition>=3.10.0

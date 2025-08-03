@@ -1,12 +1,6 @@
-# Multi-stage Dockerfile for Jetson Xavier
-# Stage 1: Base PyTorch image
-FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3 as pytorch-base
-
-# # Stage 2: Transformers image
-# FROM dustynv/transformers:r36.4.2 as transformers-base
-
-# # Stage 3: Final application image
-# FROM dustynv/transformers:r36.4.2
+# Multi-stage Dockerfile for EC2/Standard GPUs
+# Stage 1: Standard Python base image
+FROM python:3.9-slim
 
 # Set environment variables
 ENV PYTHONPATH=/workspace
@@ -42,24 +36,6 @@ RUN apt-get update && apt-get install -y \
     liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Build and install Python 3.9 from source (needed for newer transformers)
-RUN cd /tmp && \
-    wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz && \
-    tar -xzf Python-3.9.18.tgz && \
-    cd Python-3.9.18 && \
-    ./configure --enable-optimizations --with-ensurepip=install --prefix=/usr/local && \
-    make -j$(nproc) && \
-    make altinstall && \
-    cd / && \
-    rm -rf /tmp/Python-3.9.18*
-
-# Create symlinks for python3.9
-RUN ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3 && \
-    ln -sf /usr/local/bin/pip3.9 /usr/local/bin/pip3
-
-# Update PATH to use Python 3.9
-ENV PATH="/usr/local/bin:$PATH"
-
 # Install newer SQLite for ChromaDB compatibility
 RUN cd /tmp && \
     wget https://www.sqlite.org/2023/sqlite-autoconf-3420000.tar.gz && \
@@ -78,6 +54,7 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 WORKDIR /workspace
 
 # No pip cache (using --no-cache-dir for fresh installs)
+ENV PIP_CACHE_DIR=/root/.cache/pip
 
 # Copy requirements first for better caching
 COPY requirements.txt .
@@ -85,7 +62,7 @@ COPY requirements.txt .
 # Upgrade pip and build tools
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install PyTorch for Python 3.9 with CUDA support (Jetson compatible)
+# Install PyTorch with CUDA support for standard GPUs
 RUN pip3 install --no-cache-dir \
     torch \
     torchvision \
