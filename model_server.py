@@ -77,17 +77,35 @@ def chat_video():
         data = request.json
         messages = data.get('messages', [])
         
-        print(f"📨 Received video chat request with {len(messages)} messages")
+        print(f"📨 Received video chat request")
+        print(f"   Request data: {json.dumps(data, indent=2)}")
+        print(f"   Messages count: {len(messages)}")
+        
+        # Extract video path from messages for debugging
+        video_path = None
+        for msg in messages:
+            if isinstance(msg.get("content"), list):
+                for item in msg["content"]:
+                    if isinstance(item, dict) and item.get("type") == "video":
+                        video_path = item.get("path")
+                        break
+        
+        print(f"   Video path: {video_path}")
         
         # Use model manager for video request
         print(f"📤 Sending video request to model manager...")
         result = model_manager.chat_video(messages)
-        print(f"📥 Received video result from model manager: {result}")
+        print(f"📥 Received video result from model manager:")
+        print(f"   Success: {result.get('success', 'N/A')}")
+        print(f"   Error: {result.get('error', 'N/A')}")
+        print(f"   Mode: {result.get('mode', 'N/A')}")
         
         return jsonify(result)
         
     except Exception as e:
+        import traceback
         print(f"❌ Error in video chat endpoint: {e}")
+        print(f"❌ Full traceback: {traceback.format_exc()}")
         return jsonify({
             'success': False,
             'error': str(e)

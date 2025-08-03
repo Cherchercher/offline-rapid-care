@@ -221,9 +221,12 @@ class ModelManagerAPI:
             Dictionary with response and metadata
         """
         try:
-            print(f"🔗 API Model Manager: Attempting to connect to {self.api_url}")
+            print(f"🔗 API Model Manager: Video analysis request")
+            print(f"   API URL: {self.api_url}")
+            print(f"   Messages: {json.dumps(messages, indent=2)}")
             
             # Check server health first
+            print(f"🔍 Checking server health...")
             if not self._check_server_health():
                 print(f"❌ API Model Manager: Server health check failed")
                 return {
@@ -239,6 +242,9 @@ class ModelManagerAPI:
                 'messages': messages
             }
             
+            print(f"📤 Sending video analysis request to {self.api_url}/chat/video")
+            print(f"   Payload: {json.dumps(payload, indent=2)}")
+            
             # Send request to video endpoint
             response = requests.post(
                 f"{self.api_url}/chat/video",
@@ -246,24 +252,40 @@ class ModelManagerAPI:
                 timeout=300  # 5 minutes for video processing (frame extraction + analysis)
             )
             
+            print(f"📥 Response status: {response.status_code}")
+            print(f"📥 Response headers: {dict(response.headers)}")
+            
             if response.status_code == 200:
                 result = response.json()
                 result['mode'] = 'api-video'
+                print(f"✅ Video analysis successful: {result}")
                 return result
             else:
+                error_msg = f'API server error: {response.status_code}'
+                try:
+                    error_detail = response.json()
+                    error_msg += f" - {error_detail}"
+                except:
+                    error_msg += f" - {response.text}"
+                
+                print(f"❌ Video analysis failed: {error_msg}")
                 return {
                     'success': False,
-                    'error': f'API server error: {response.status_code}',
+                    'error': error_msg,
                     'mode': 'api-video'
                 }
                 
         except requests.exceptions.Timeout:
+            print(f"⏰ Video analysis timeout")
             return {
                 'success': False,
                 'error': 'Request timeout - video analysis took too long',
                 'mode': 'api-video'
             }
         except Exception as e:
+            import traceback
+            print(f"💥 Video analysis exception: {e}")
+            print(f"💥 Full traceback: {traceback.format_exc()}")
             return {
                 'success': False,
                 'error': str(e),
