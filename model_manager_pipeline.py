@@ -12,6 +12,15 @@ import os
 import cv2
 from prompts import MEDICAL_TRIAGE_PROMPT
 
+# Try to import Unsloth for FastVisionModel
+try:
+    from unsloth import FastVisionModel
+    UNSLOTH_AVAILABLE = True
+    print("✅ Unsloth FastVisionModel available")
+except ImportError:
+    UNSLOTH_AVAILABLE = False
+    print("⚠️  Unsloth not available, using standard model loading")
+
 class ModelManagerPipeline:
     """Model manager using direct model loading for all tasks"""
     
@@ -145,6 +154,18 @@ class ModelManagerPipeline:
                     low_cpu_mem_usage=True
                 )
                 print("✅ Model loaded on CPU")
+            
+            # Try to enable Unsloth FastVisionModel.for_inference() if available
+            try:
+                if UNSLOTH_AVAILABLE and hasattr(self.direct_model, 'for_inference'):
+                    self.direct_model = self.direct_model.for_inference()
+                    print("✅ Unsloth FastVisionModel.for_inference() enabled")
+                elif UNSLOTH_AVAILABLE:
+                    print("⚠️  FastVisionModel.for_inference() not available on this model")
+                else:
+                    print("⚠️  Unsloth not available, using standard model loading")
+            except Exception as e:
+                print(f"⚠️  Could not enable FastVisionModel.for_inference(): {e}")
             
             self._model_loaded = True
             print("✅ Direct model loaded successfully")
@@ -290,50 +311,62 @@ class ModelManagerPipeline:
             
             start_time = time.time()
             
-            # Apply chat template - let the processor handle images from messages
-            print(f"🔊 Applying chat template with messages")
-            template_start = time.time()
-            input_ids = self.direct_processor.apply_chat_template(
-                messages,
-                add_generation_prompt=True,
-                tokenize=True,
-                return_dict=True,
-                return_tensors="pt"
-            )
-            template_time = time.time() - template_start
-            print(f"🔊 Chat template applied in {template_time:.2f} seconds")
+            # Extract image and text from messages (compatible with Colab approach)
+            image = None
+            prompt_text = ""
             
-            # Move to the same device as the model
-            model_dtype = next(self.direct_model.parameters()).dtype
-            input_ids = input_ids.to(self.device, dtype=model_dtype)
-            print(f"🔊 Using model dtype: {model_dtype} on device: {self.device}")
+            for msg in messages:
+                if isinstance(msg.get("content"), list):
+                    for item in msg["content"]:
+                        if isinstance(item, dict):
+                            if item.get("type") == "image" and "image" in item:
+                                image = item["image"]
+                            elif item.get("type") == "text":
+                                prompt_text = item.get("text", "")
             
-            # --- ADDED: Input tensor validation ---
-            for k, v in input_ids.items():
-                if hasattr(v, 'shape'):
-                    print(f"🔍 Tensor {k}: shape={v.shape}, dtype={v.dtype}, min={v.min().item()}, max={v.max().item()}, any NaN={torch.isnan(v).any().item()}, any Inf={torch.isinf(v).any().item()}")
-                    if torch.isnan(v).any() or torch.isinf(v).any():
-                        raise ValueError(f"Input tensor {k} contains NaN or Inf values!")
-            # --- END ADDED ---
-            
-            # Generate response
-            try:
-                outputs = self.direct_model.generate(
-                    **input_ids, 
-                    max_new_tokens=256,
-                    do_sample=True,
-                    temperature=0.7
-                )
-            except RuntimeError as gen_err:
-                print(f"❌ Model generate() failed: {gen_err}")
-                # If probability tensor error, suggest updating model or preprocessing
-                if 'probability tensor' in str(gen_err):
-                    print("⚠️  Probability tensor error: consider updating model weights, preprocessing, or temperature parameter.")
+            if image is None:
                 return {
                     'success': False,
-                    'error': str(gen_err),
+                    'error': 'No image found in messages',
                     'mode': 'image-direct'
                 }
+            
+            # Use Colab-compatible approach
+            print(f"🔊 Processing image with Colab-compatible method")
+            
+            # Create messages in Colab format
+            colab_messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "image"}, {"type": "text", "text": prompt_text}],
+                }
+            ]
+            
+            # Apply chat template like Colab
+            input_text = self.direct_processor.apply_chat_template(
+                colab_messages, 
+                add_generation_prompt=True
+            )
+            
+            # Process inputs like Colab
+            inputs = self.direct_processor(
+                image,
+                input_text,
+                add_special_tokens=False,
+                return_tensors="pt"
+            ).to(self.device)
+            
+            print(f"🔊 Inputs processed, shape: {inputs['input_ids'].shape}")
+            
+            # Generate with Colab parameters
+            outputs = self.direct_model.generate(
+                **inputs,
+                max_new_tokens=512,  # Increased for better responses
+                temperature=1.0,
+                top_p=0.95,
+                top_k=64,
+                use_cache=True
+            )
             
             # Decode response
             decoded_outputs = self.direct_processor.batch_decode(
@@ -347,12 +380,11 @@ class ModelManagerPipeline:
             else:
                 response_text = str(decoded_outputs)
             
-            # Extract just the model's response (after <start_of_turn>model)
+            # Extract just the model's response
             if '<start_of_turn>model' in response_text:
                 model_response = response_text.split('<start_of_turn>model')[-1]
                 if '<end_of_turn>' in model_response:
                     model_response = model_response.split('<end_of_turn>')[0]
-                # Clean up any remaining special tokens
                 model_response = model_response.replace('<bos>', '').replace('<eos>', '').strip()
             else:
                 model_response = response_text

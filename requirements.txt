@@ -17,6 +17,7 @@ torchvision>=0.15.0
 torchaudio>=2.0.0
 transformers>=4.51.3
 accelerate>=0.24.0
+unsloth>=2024.1
 
 # Audio processing - only what's actually used
 SpeechRecognition>=3.10.0
