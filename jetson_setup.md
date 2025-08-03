@@ -1,26 +1,26 @@
-# Jetson Nano Setup Guide for Gemma 3n Medical Triage
+# Jetson Setup Guide for Gemma 3n Medical Triage (Docker)
 
 ## Overview
 
-This guide covers setting up the fine-tuned Gemma 3n model on NVIDIA Jetson Nano for medical triage and multimodal AI tasks.
+This guide covers setting up the fine-tuned Gemma 3n model on NVIDIA Jetson using Docker for consistent, reproducible deployment.
 
-## Quick Start
+## Quick Start (Docker)
 
-1. **Download the 4B model** (recommended for Jetson Nano):
+1. **Clone and setup**:
    ```bash
-   python3 scripts/download_gemma_models.py --model 4b --check-space
+   git clone <your-repo>
+   cd offline-gemma
    ```
 
-2. **Run the web interface**:
+2. **Build and run with Docker**:
    ```bash
-   python3 app.py --model-path ./models/gemma3n-4b
+   ./build_and_run.sh
    ```
 
-3. **For better performance**, download both models and use load monitoring:
-   ```bash
-   python3 scripts/download_gemma_models.py --model both --check-space
-   python3 scripts/jetson_load_monitor.py
-   ```
+3. **Access the application**:
+   - Web Interface: http://localhost:5050
+   - Model API: http://localhost:5001
+   - Upload Server: http://localhost:11435
 
 ## Hardware Requirements
 
@@ -38,54 +38,88 @@ This guide covers setting up the fine-tuned Gemma 3n model on NVIDIA Jetson Nano
 # Enable all components including CUDA, cuDNN, TensorRT
 ```
 
-### 2. Install Dependencies
+### 2. Install Docker
 ```bash
 # Update system
 sudo apt update && sudo apt upgrade -y
 
-# Install Python dependencies
-sudo apt install python3-pip python3-dev python3-venv
-sudo apt install libopenblas-dev liblapack-dev
+# Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
 
-# Install audio dependencies
-sudo apt install ffmpeg portaudio19-dev python3-pyaudio
+# Add user to docker group
+sudo usermod -aG docker $USER
+newgrp docker
 
-# Install PyTorch for Jetson
-pip3 install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
-
-# Install transformers and quantization libraries
-pip3 install transformers accelerate bitsandbytes
-pip3 install soundfile librosa
+# Install Docker Compose
+sudo apt install docker-compose
 ```
 
-## Model Download and Setup
-
-### Install Pytorch and Dependencies with docker
-nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.11-py3
-dustynv/transformers:r35.1.1.
-
-### 1. Download Gemma 3n Models
-
-The project includes a convenient script to download Gemma 3n models. For Jetson Nano, we recommend starting with the 4B model for better performance:
-
+### 3. Verify Docker Installation
 ```bash
-# Clone your repository
-git clone <your-repo>
-cd offline-gemma
+# Check Docker version
+docker --version
 
-# Download the 4B model first (recommended for Jetson Nano)
-python3 scripts/download_gemma_models.py --model 4b
+# Test Docker with NVIDIA runtime
+docker run --rm --runtime=nvidia --gpus all nvidia/cuda:11.0-base nvidia-smi
+```
 
-# Check disk space before downloading (optional)
-python3 scripts/download_gemma_models.py --model 4b --check-space
+## Docker Deployment
 
-# Download both models if you have enough space
-python3 scripts/download_gemma_models.py --model both --check-space
+### 1. Build the Docker Image
+```bash
+# Build the Jetson-optimized image
+./build_and_run.sh
+```
+
+This script will:
+- Build the Docker image with Python 3.9 and all dependencies
+- Download the 4B model inside the container
+- Start all services (Flask app, Model server, Upload server)
+- Mount necessary volumes for persistence
+
+### 2. Manual Build (Alternative)
+```bash
+# Build only the Docker image
+docker build -t offline-gemma-jetson .
+
+# Run the container
+docker run -d \
+    --name offline-gemma-jetson \
+    --runtime=nvidia \
+    --gpus all \
+    -p 5050:5050 \
+    -p 5001:5001 \
+    -p 11435:11435 \
+    -v $(pwd)/models:/workspace/models \
+    -v $(pwd)/uploads:/workspace/uploads \
+    -v $(pwd)/rapidcare_offline.db:/workspace/rapidcare_offline.db \
+    -v $(pwd)/offload:/workspace/offload \
+    -v /etc/nv_tegra_release:/etc/nv_tegra_release:ro \
+    -v /proc/device-tree/model:/proc/device-tree/model:ro \
+    -v /tmp:/tmp \
+    offline-gemma-jetson
+```
+
+### 3. Start Services
+```bash
+# Start all services inside the container
+docker exec -d offline-gemma-jetson python3 serve_uploads.py
+docker exec -d offline-gemma-jetson python3 model_server.py
+```
+
+## Model Management
+
+### 1. Download Models (Inside Docker)
+```bash
+# Download 4B model inside container
+docker exec offline-gemma-jetson python3 scripts/download_gemma_models.py --model 4b
+
+# Check model status
+docker exec offline-gemma-jetson ls -la /workspace/models/
 ```
 
 ### 2. Model Options
-
-The downloader supports two model sizes:
 
 - **4B Model** (`cherchercher020/gemma-3N-finetune-100-injury-images`): ~8GB
   - Better performance and quality
@@ -97,191 +131,199 @@ The downloader supports two model sizes:
   - Good for quick tasks
   - Basic multimodal capabilities
 
-### 3. Download Commands
+## Docker Architecture
 
-```bash
-# Download 4B model (recommended)
-python3 scripts/download_gemma_models.py --model 4b
+### Services Running in Container
+1. **Flask App** (port 5050): Main web interface
+2. **Model API Server** (port 5001): AI model inference
+3. **Upload Server** (port 11435): File upload handling
 
-# Download 2B model
-python3 scripts/download_gemma_models.py --model 2b
-
-# Download both models
-python3 scripts/download_gemma_models.py --model both
-
-# Check disk space before downloading
-python3 scripts/download_gemma_models.py --model 4b --check-space
-
-# Test model loading after download
-python3 scripts/download_gemma_models.py --model 4b --test-load
-```
-
-### 4. Model Fine-tuning Details
-
-The models are fine-tuned specifically for medical triage applications:
-
-- **4B Model**: Fine-tuned on 100 injury images for medical assessment
-- **2B Model**: Base Gemma 3n model with multimodal capabilities
-- **Medical capabilities**: Injury detection, wound assessment, triage recommendations
+### Volume Mounts
+- `./models` → `/workspace/models`: Model files
+- `./uploads` → `/workspace/uploads`: Uploaded files
+- `./rapidcare_offline.db` → `/workspace/rapidcare_offline.db`: Database
+- `./offload` → `/workspace/offload`: Model offloading
+- `/tmp` → `/tmp`: Temporary files
+- Jetson-specific files for device detection
 
 ## Performance Expectations
 
-### Model Comparison
-
-| Model | Size | RAM Usage | Speed | Quality | Use Case |
-|-------|------|-----------|-------|---------|----------|
-| 4B Model | ~8GB | ~3.5GB | Medium | High | Primary use |
-| 2B Model | ~4GB | ~2.5GB | Fast | Good | Quick tasks |
-
-### Memory Usage
-- **4B Model loading**: ~3.5GB RAM
-- **2B Model loading**: ~2.5GB RAM
-- **Audio processing**: ~500MB additional
-- **Total peak (4B)**: ~4GB (within 4GB limit with optimization)
-
-### Speed Performance
+### Docker Performance
+- **Container startup**: 30-60 seconds
 - **Model loading**: 30-90 seconds (4B), 20-60 seconds (2B)
-- **Audio transcription**: 2-5 seconds per token (4B), 1-3 seconds per token (2B)
-- **30-second audio**: 30-90 seconds total processing time
+- **Video processing**: 2-10 minutes (depending on file size)
+- **Memory usage**: ~3.5GB (4B model)
 
-### Quality Impact
-- **4B Model**: Best quality, injury detection capabilities
-- **2B Model**: Good quality, basic multimodal capabilities
-- **Audio transcription**: Maintains good accuracy on both models
+### Optimization Tips
+```bash
+# Monitor container resources
+docker stats offline-gemma-jetson
+
+# View container logs
+docker logs -f offline-gemma-jetson
+
+# Check specific service logs
+docker logs offline-gemma-jetson | grep "5001\|model_server"
+```
 
 ## Usage Examples
 
-### 1. Basic Medical Triage
-```python
-from jetson_gemma_runner import JetsonGemmaRunner
-
-# Initialize runner
-runner = JetsonGemmaRunner("./models/gemma3n-4b")
-
-# Analyze injury image
-result = runner.analyze_injury("injury_photo.jpg")
-print(f"Triage assessment: {result}")
-```
-
-### 2. Web Interface
+### 1. Web Interface
 ```bash
-# Run the Flask app with 4B model
-python3 app.py --model-path ./models/gemma3n-4b
+# Access the main application
+open http://localhost:5050
 
-# Run with 2B model for faster performance
-python3 app.py --model-path ./models/gemma3n-2b
+# Upload images/videos for medical triage
+# Use the web interface for injury assessment
 ```
 
-### 3. Dual Model Setup (Advanced)
-
-For optimal performance, you can use both models with automatic switching:
-
+### 2. API Usage
 ```bash
-# Run load monitoring to automatically choose the best model
-python3 scripts/jetson_load_monitor.py
+# Test model API
+curl -X POST http://localhost:5001/chat/text \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":[{"type":"text","text":"Hello"}]}]}'
 
-# This will automatically switch between 2B and 4B models based on:
-# - System load
-# - Available memory
-# - Task complexity
+# Test video processing
+curl -X POST http://localhost:5001/test-video-simple \
+  -H "Content-Type: application/json" \
+  -d '{"messages":[{"role":"user","content":[{"type":"video","path":"/tmp/test.mp4"}]}]}'
 ```
 
-## Optimization Tips
-
-### 1. Memory Management
-```python
-# Use aggressive garbage collection
-import gc
-gc.collect()
-
-# Limit concurrent operations
-torch.set_num_threads(4)  # Use all 4 cores
-```
-
-### 2. Image Processing
-```python
-# Use standard image formats (JPEG, PNG)
-# Ensure good lighting for injury photos
-# Use high resolution for detailed assessment
-```
-
-### 3. System Tuning
+### 3. Log Monitoring
 ```bash
-# Disable GUI to save memory
-sudo systemctl set-default multi-user.target
+# View all logs with color coding
+./scripts/view_all_logs.sh
 
-# Increase swap space
-sudo fallocate -l 2G /swapfile
-sudo chmod 600 /swapfile
-sudo mkswap /swapfile
-sudo swapon /swapfile
+# View specific service logs
+./scripts/view_model_logs.sh    # Model server
+./scripts/view_flask_logs.sh    # Flask app
+./scripts/view_upload_logs.sh   # Upload server
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### Common Docker Issues
 
-1. **Out of Memory Errors**
-   - Close other applications
-   - Increase swap space
-   - Use 2B model for lower memory usage
+1. **Permission Denied**
+   ```bash
+   # Fix Docker permissions
+   sudo usermod -aG docker $USER
+   newgrp docker
+   ```
 
-2. **Slow Performance**
-   - Check CPU usage with `htop`
-   - Ensure proper cooling (Jetson Nano throttles when hot)
-   - Use 2B model for faster processing
+2. **Out of Memory**
+   ```bash
+   # Check container memory usage
+   docker stats offline-gemma-jetson
+   
+   # Restart container
+   docker restart offline-gemma-jetson
+   ```
 
-3. **Image Processing Issues**
-   - Ensure good lighting for injury photos
-   - Use high resolution images for detailed assessment
-   - Check image format compatibility (JPEG, PNG)
+3. **Model Not Loading**
+   ```bash
+   # Check if model files exist
+   docker exec offline-gemma-jetson ls -la /workspace/models/
+   
+   # Download models again
+   docker exec offline-gemma-jetson python3 scripts/download_gemma_models.py --model 4b
+   ```
 
-### Performance Monitoring
+4. **Port Already in Use**
+   ```bash
+   # Stop existing container
+   docker stop offline-gemma-jetson
+   docker rm offline-gemma-jetson
+   
+   # Rebuild and run
+   ./build_and_run.sh
+   ```
+
+### Debug Commands
 ```bash
-# Monitor system resources
-htop
-nvidia-smi  # GPU usage
-free -h     # Memory usage
-df -h       # Disk usage
+# Check container status
+docker ps
+
+# View all logs
+docker logs offline-gemma-jetson
+
+# Enter container shell
+docker exec -it offline-gemma-jetson bash
+
+# Check GPU access
+docker exec offline-gemma-jetson nvidia-smi
+
+# Test model server
+curl http://localhost:5001/health
 ```
 
-## Use Cases for Jetson Nano
+## Docker Commands Reference
 
-### 1. Medical Triage and Assessment
-- **Emergency response**: Injury assessment in field
-- **Remote medicine**: Wound evaluation
-- **First aid**: Triage recommendations
+### Container Management
+```bash
+# Start container
+docker start offline-gemma-jetson
 
-### 2. Edge AI Applications
-- **Privacy**: No internet required
-- **Latency**: Local processing
-- **Reliability**: Works without cloud connectivity
+# Stop container
+docker stop offline-gemma-jetson
 
-### 3. Medical IoT Integration
-- **Field hospitals**: Portable injury assessment
-- **Ambulance systems**: Real-time triage
-- **Rural healthcare**: Offline medical assistance
+# Remove container
+docker rm offline-gemma-jetson
 
-## Comparison with Other Devices
+# Rebuild image
+docker build -t offline-gemma-jetson .
+```
 
-| Device | RAM | Model Size | Speed | Cost |
-|--------|-----|------------|-------|------|
-| Jetson Nano | 4GB | 3GB | Slow | $99 |
-| Jetson Xavier NX | 8GB | 3GB | Fast | $399 |
-| Desktop (8GB) | 8GB | 11GB | Fast | $500+ |
-| Cloud GPU | 16GB+ | 11GB | Very Fast | $1-5/hr |
+### Log Management
+```bash
+# View real-time logs
+docker logs -f offline-gemma-jetson
+
+# View last 100 lines
+docker logs --tail 100 offline-gemma-jetson
+
+# View logs since timestamp
+docker logs --since "2024-01-01T00:00:00" offline-gemma-jetson
+```
+
+### Volume Management
+```bash
+# List volumes
+docker volume ls
+
+# Backup data
+docker cp offline-gemma-jetson:/workspace/rapidcare_offline.db ./backup/
+
+# Restore data
+docker cp ./backup/rapidcare_offline.db offline-gemma-jetson:/workspace/
+```
+
+## Comparison with Native Installation
+
+| Aspect | Docker | Native |
+|--------|--------|--------|
+| **Setup Time** | 5 minutes | 30+ minutes |
+| **Dependencies** | Automatic | Manual |
+| **Reproducibility** | High | Low |
+| **Isolation** | Complete | System-wide |
+| **Updates** | Rebuild image | Update system |
+| **Debugging** | Container logs | System logs |
 
 ## Conclusion
 
-The quantized Gemma 3n model is well-suited for Jetson Nano deployment, offering:
-- ✅ **Feasible memory usage** (2.5GB RAM)
-- ✅ **Good quality retention** (1-2% degradation)
-- ✅ **Offline operation** (no internet required)
-- ⚠️ **Slow performance** (2-5s per token)
-- ⚠️ **Limited concurrent users** (single user recommended)
+Docker deployment on Jetson provides:
+- ✅ **Consistent environment** across different Jetson devices
+- ✅ **Easy setup** with single command
+- ✅ **Isolated dependencies** (no system conflicts)
+- ✅ **Reproducible builds** (same image everywhere)
+- ✅ **Easy updates** (rebuild image)
+- ✅ **Simple debugging** (container logs)
 
-For production use cases requiring faster performance, consider Jetson Xavier NX or cloud deployment. 
-
+The Docker approach is recommended for production deployment and development.
 
 ### Extras
-screen recording in jetson: gst-launch-1.0 ximagesrc num-buffers=100 use-damage=0 ! video/x-raw ! nvvidconv ! 'video/x-raw(memory:NVMM),format=NV12' ! nvv4l2h264enc ! h264parse ! qtmux ! filesink location=a.mp4
+Screen recording in Jetson:
+```bash
+gst-launch-1.0 ximagesrc num-buffers=100 use-damage=0 ! video/x-raw ! nvvidconv ! 'video/x-raw(memory:NVMM),format=NV12' ! nvv4l2h264enc ! h264parse ! qtmux ! filesink location=a.mp4
+```

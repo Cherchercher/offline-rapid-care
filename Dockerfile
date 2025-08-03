@@ -76,19 +76,24 @@ ENV LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 # Set working directory
 WORKDIR /workspace
 
+# Set pip cache directory for faster builds
+ENV PIP_CACHE_DIR=/root/.cache/pip
+
 # Copy requirements first for better caching
 COPY requirements.txt .
 
-# Install Python dependencies with better error handling
-RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
-RUN pip3 install --no-cache-dir backports.zoneinfo==0.2.1
-RUN pip3 install --no-cache-dir -r requirements.txt
+# Upgrade pip and build tools
+RUN pip3 install --upgrade pip setuptools wheel
+
+# Install dependencies using pip cache
+RUN pip3 install --cache-dir=$PIP_CACHE_DIR backports.zoneinfo==0.2.1
+RUN pip3 install --cache-dir=$PIP_CACHE_DIR -r requirements.txt
 
 # Fix numpy compatibility issue with OpenCV
-RUN pip3 install --no-cache-dir "numpy>=1.24.0,<2.0.0"
+RUN pip3 install --cache-dir=$PIP_CACHE_DIR "numpy>=1.24.0,<2.0.0"
 
 # Install additional dependencies that might be needed
-RUN pip3 install --no-cache-dir \
+RUN pip3 install --cache-dir=$PIP_CACHE_DIR \
     pyaudio \
     psycopg2-binary \
     opencv-python-headless \
