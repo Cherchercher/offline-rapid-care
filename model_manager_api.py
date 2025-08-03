@@ -249,7 +249,7 @@ class ModelManagerAPI:
             response = requests.post(
                 f"{self.api_url}/chat/video",
                 json=payload,
-                timeout=300  # 5 minutes for video processing (frame extraction + analysis)
+                timeout=600  # 10 minutes for video processing (frame extraction + analysis)
             )
             
             print(f"📥 Response status: {response.status_code}")
@@ -276,10 +276,15 @@ class ModelManagerAPI:
                 }
                 
         except requests.exceptions.Timeout:
-            print(f"⏰ Video analysis timeout")
+            print(f"⏰ Video analysis timeout after 10 minutes")
+            print(f"   This could be due to:")
+            print(f"   - Large video file")
+            print(f"   - Slow model inference")
+            print(f"   - Frame extraction issues")
+            print(f"   - Memory constraints")
             return {
                 'success': False,
-                'error': 'Request timeout - video analysis took too long',
+                'error': 'Request timeout - video analysis took too long (10 minutes). Try a shorter video or check system resources.',
                 'mode': 'api-video'
             }
         except Exception as e:

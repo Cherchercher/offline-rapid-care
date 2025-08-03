@@ -187,6 +187,53 @@ def test_text():
             'error': str(e)
         }), 500
 
+@app.route('/test-video-simple', methods=['POST'])
+def test_video_simple():
+    """Simple video test endpoint - just check if file exists"""
+    try:
+        data = request.json
+        messages = data.get('messages', [])
+        
+        print(f"📨 Received simple video test request")
+        
+        # Extract video path
+        video_path = None
+        for msg in messages:
+            if isinstance(msg.get("content"), list):
+                for item in msg["content"]:
+                    if isinstance(item, dict) and item.get("type") == "video":
+                        video_path = item.get("path")
+                        break
+        
+        if not video_path:
+            return jsonify({
+                'success': False,
+                'error': 'No video path found'
+            })
+        
+        # Just check if file exists and get basic info
+        import os
+        if os.path.exists(video_path):
+            size = os.path.getsize(video_path)
+            return jsonify({
+                'success': True,
+                'message': f'Video file exists: {video_path} ({size} bytes)',
+                'file_size': size,
+                'file_path': video_path
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': f'Video file not found: {video_path}'
+            })
+        
+    except Exception as e:
+        print(f"❌ Error in simple video test: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
 if __name__ == '__main__':
     print("🔧 Model API Server ready on port 5001")
     print("📊 Health check: http://localhost:5001/health")
