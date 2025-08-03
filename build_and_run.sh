@@ -62,6 +62,7 @@ docker run -d \
     -v $(pwd)/scripts:/workspace/scripts \
     -v /etc/nv_tegra_release:/etc/nv_tegra_release:ro \
     -v /proc/device-tree/model:/proc/device-tree/model:ro \
+    -v /tmp:/tmp \
     --restart unless-stopped \
     offline-gemma-jetson
 
