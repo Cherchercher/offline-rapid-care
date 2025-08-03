@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, send_from_directory,
 import requests
 import json
 import os
+
 from datetime import datetime
 import uuid
 from typing import Dict
@@ -54,14 +55,14 @@ def index():
 @app.route('/offline.html')
 def offline_page():
     from flask import send_from_directory
-    import os
+    
     templates_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'templates')
     return send_from_directory(templates_dir, 'offline.html')
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     """Serve uploaded files with proper MIME types"""
-    import os
+    
     from flask import send_from_directory, Response
     
     file_path = os.path.join(UPLOADS_DIR, filename)
@@ -523,7 +524,7 @@ def transcribe_voice():
         # Online mode - process normally
         # Save audio temporarily
         import tempfile
-        import os
+        
         
         with tempfile.NamedTemporaryFile(delete=False, suffix='.wav') as tmp_file:
             audio_file.save(tmp_file.name)
@@ -1257,7 +1258,7 @@ def analyze_image_file(file, user_role):
     """Analyze an uploaded image file"""
     try:
         # Save image to uploads directory
-        import os
+        
         from PIL import Image
         import numpy as np
         from datetime import datetime
@@ -1315,13 +1316,30 @@ def analyze_image_file(file, user_role):
 def analyze_video_file(file, user_role):
     """Analyze an uploaded video file using the new API approach"""
     try:
-        # Save video temporarily
+        # Save video temporarily in uploads directory
         import tempfile
-        import os
         
+        import time
+        
+        print(f"🎬 Starting video analysis for file: {file.filename}")
+        print(f"   Content type: {file.content_type}")
+        print(f"   File size: {len(file.read())} bytes")
+        file.seek(0)  # Reset file pointer
+        
+        # Save video temporarily
         with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
             file.save(tmp_file.name)
             tmp_path = tmp_file.name
+        
+        print(f"✅ Video saved to: {tmp_path}")
+        print(f"   Temporary file size: {os.path.getsize(tmp_path)} bytes")
+        print(f"   Temporary file exists: {os.path.exists(tmp_path)}")
+        print(f"   Absolute path: {os.path.abspath(tmp_path)}")
+        
+        # Small delay to ensure file is fully written and accessible
+        import time
+        time.sleep(1)
+        print(f"⏳ Waited 1 second, file still exists: {os.path.exists(tmp_path)}")
         
         # Use the new API approach - same as direct curl call
         messages = [
@@ -1336,15 +1354,18 @@ def analyze_video_file(file, user_role):
         # Use the model manager's video endpoint
         result = model_manager.chat_video(messages)
         
-        # Clean up
+        # Clean up after processing is complete
         try:
             os.unlink(tmp_path)
-        except:
-            pass
+            print(f"🧹 Cleaned up temporary file: {tmp_path}")
+        except Exception as cleanup_error:
+            print(f"⚠️  Failed to cleanup temporary file: {cleanup_error}")
         
         if result['success']:
+            print(f"✅ Video analysis successful")
             return result['response']
         else:
+            print(f"❌ Video analysis failed: {result.get('error', 'Unknown error')}")
             return f"Error analyzing video: {result.get('error', 'Unknown error')}"
         
     except Exception as e:
@@ -1436,7 +1457,7 @@ def transcribe_audio_with_direct_model(audio_path, user_role):
     try:
         import speech_recognition as sr
         from pydub import AudioSegment
-        import os
+        
         
         # Convert audio to WAV if needed
         audio = AudioSegment.from_file(audio_path)

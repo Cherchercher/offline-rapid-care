@@ -84,6 +84,9 @@ RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 RUN pip3 install --no-cache-dir backports.zoneinfo==0.2.1
 RUN pip3 install --no-cache-dir -r requirements.txt
 
+# Fix numpy compatibility issue with OpenCV
+RUN pip3 install --no-cache-dir "numpy>=1.24.0,<2.0.0"
+
 # Install additional dependencies that might be needed
 RUN pip3 install --no-cache-dir \
     pyaudio \
