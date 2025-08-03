@@ -28,13 +28,13 @@ class ModelManagerPipeline:
         # Auto-detect device for any GPU
         if device is None:
             if torch.cuda.is_available():
-                            # Check if it's a Jetson device (multiple indicators)
-            is_jetson = self._is_jetson_device()
-            if is_jetson:
-                print("🚀 Detected Jetson device, using CUDA")
-            else:
-                print("🚀 Detected standard GPU device, using CUDA")
-            self.device = "cuda:0"
+                # Check if it's a Jetson device (multiple indicators)
+                is_jetson = self._is_jetson_device()
+                if is_jetson:
+                    print("🚀 Detected Jetson device, using CUDA")
+                else:
+                    print("🚀 Detected standard GPU device, using CUDA")
+                self.device = "cuda:0"
             else:
                 print("🚀 No CUDA available, using CPU")
                 self.device = "cpu"
