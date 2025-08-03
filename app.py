@@ -337,6 +337,10 @@ def analyze_media():
                 # Save file to uploads directory first
                 filename = secure_filename(file.filename)
                 file_path = os.path.join(UPLOADS_DIR, filename)
+                
+                # Ensure uploads directory exists
+                os.makedirs(UPLOADS_DIR, exist_ok=True)
+                
                 file.save(file_path)
                 
                 # Determine task type and process immediately
@@ -408,6 +412,9 @@ def analyze_media():
         for file in files:
             if file.filename == '':
                 continue
+            
+            # Ensure uploads directory exists for any file operations
+            os.makedirs(UPLOADS_DIR, exist_ok=True)
                 
             # Determine file type
             if file.content_type.startswith('image/'):
@@ -490,6 +497,10 @@ def transcribe_voice():
             # Store audio for offline processing
             filename = secure_filename(audio_file.filename)
             file_path = os.path.join(UPLOADS_DIR, filename)
+            
+            # Ensure uploads directory exists
+            os.makedirs(UPLOADS_DIR, exist_ok=True)
+            
             audio_file.save(file_path)
             
             # Store for offline processing
