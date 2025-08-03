@@ -15,7 +15,7 @@ numpy>=1.24.0
 torch>=2.0.0
 torchvision>=0.15.0
 torchaudio>=2.0.0
-transformers>=4.50.0
+transformers>=4.51.3
 accelerate>=0.24.0
 
 # Audio processing - only what's actually used
@@ -27,3 +27,4 @@ sentence-transformers>=2.2.0
 
 # HTTP requests for API calls
 requests>=2.31.0
+
