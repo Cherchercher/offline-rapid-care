@@ -324,6 +324,9 @@ class ModelManagerPipeline:
             Dictionary with response and metadata
         """
         try:
+            print(f"🎬 === MODEL MANAGER PIPELINE VIDEO START ===")
+            print(f"   Messages received: {json.dumps(messages, indent=2)}")
+            
             # Extract video path from messages
             video_path = None
             for msg in messages:
@@ -334,6 +337,7 @@ class ModelManagerPipeline:
                             break
             
             if not video_path:
+                print(f"❌ No video path found in messages")
                 return {
                     'success': False,
                     'error': 'No video path found in messages',
@@ -344,7 +348,20 @@ class ModelManagerPipeline:
             print(f"   Video path: {video_path}")
             
             # Check if video file exists
-            if not os.path.exists(video_path):
+            print(f"🔍 Checking if video file exists: {video_path}")
+            file_exists = os.path.exists(video_path)
+            print(f"   File exists: {file_exists}")
+            
+            if not file_exists:
+                print(f"❌ Video file not found: {video_path}")
+                # List contents of the directory
+                import os
+                dir_path = os.path.dirname(video_path)
+                if os.path.exists(dir_path):
+                    print(f"   Directory contents: {os.listdir(dir_path)}")
+                else:
+                    print(f"   Directory does not exist: {dir_path}")
+                
                 return {
                     'success': False,
                     'error': f'Video file not found: {video_path}',
