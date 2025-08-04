@@ -16,7 +16,7 @@ def download_gemma_model(model_size: str = "2b", local_dir: str = None):
         model_id = "google/gemma-3n-E2B-it"
         model_name = "gemma3n-2b"
     elif model_size.lower() == "4b":
-        model_id = "cherchercher020/gemma-3N-finetune-100-injury-images"
+        model_id = "google/gemma-3n-E4B-it"
         model_name = "gemma3n-4b"
     else:
         raise ValueError("Model size must be '2b' or '4b'")
@@ -33,6 +33,7 @@ def download_gemma_model(model_size: str = "2b", local_dir: str = None):
     try:
         # Download model files
         snapshot_download(
+            use_auth_token="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",
             repo_id=model_id,
             local_dir=local_dir,
             local_dir_use_symlinks=False

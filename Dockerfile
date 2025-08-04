@@ -13,6 +13,32 @@ ENV PYTHONPATH=/workspace
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
 
+# Test base image CUDA and PyTorch GPU availability
+
+# Test base image CUDA and PyTorch GPU availability
+RUN echo "🔍 Testing base image CUDA/GPU availability..." && \
+    echo "================================================" && \
+    echo "Python version:" && python3 --version && \
+    echo "================================================" && \
+    echo "NVIDIA-SMI test:" && \
+    (nvidia-smi || echo "❌ nvidia-smi not available in base image") && \
+    echo "================================================" && \
+    echo "NVCC test:" && \
+    (nvcc --version || echo "❌ nvcc not available in base image") && \
+    echo "================================================" && \
+    echo "PyTorch CUDA test:" && \
+    python3 -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA compiled version:', torch.version.cuda); print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')" && \
+    echo "================================================" && \
+    echo "✅ Base image CUDA/GPU test complete" && \
+    echo "================================================"
+
+
+# CUDA environment variables for GPU detection
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV TORCH_CUDA_ARCH_LIST="5.3;6.2;7.2"
+
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     python3-pip \
@@ -58,6 +84,20 @@ RUN ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3 && \
 
 # Update PATH to use Python 3.9
 ENV PATH="/usr/local/bin:$PATH"
+
+# Test CUDA and PyTorch after Python 3.9 installation
+RUN echo "🔍 Testing CUDA/GPU after Python 3.9 installation..." && \
+    echo "================================================" && \
+    echo "Python version after upgrade:" && python3 --version && \
+    echo "Which python3:" && which python3 && \
+    echo "Python3 executable:" && ls -la /usr/local/bin/python3 && \
+    echo "================================================" && \
+    echo "Testing PyTorch import with Python 3.9:" && \
+    (python3 -c "import torch; print('✅ PyTorch imported with Python 3.9'); print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count())" || echo "❌ PyTorch not available with Python 3.9 - will need to reinstall") && \
+    echo "================================================" && \
+    echo "✅ Python 3.9 CUDA/GPU test complete" && \
+    echo "================================================"
+
 
 # Install newer SQLite for ChromaDB compatibility
 RUN cd /tmp && \

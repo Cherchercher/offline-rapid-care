@@ -26,6 +26,8 @@ class ModelManagerPipeline:
         self.model_path = model_path
         
         # Auto-detect device for any GPU
+        print(device)
+        print("device is")
         if device is None:
             if torch.cuda.is_available():
                 # Check if it's a Jetson device (multiple indicators)
@@ -109,7 +111,7 @@ class ModelManagerPipeline:
             )
             
             # Load model with GPU optimizations
-            if self.device == "cuda:0" and torch.cuda.is_available():
+            if self.device == "Xavier" and torch.cuda.is_available():
                 is_jetson = self._is_jetson_device()
                 
                 if is_jetson:
