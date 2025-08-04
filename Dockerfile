@@ -1,6 +1,24 @@
 # Multi-stage Dockerfile for Jetson Xavier
-# Stage 1: Use simple Python base image (mount everything from host)
-FROM python:3.9-slim
+# Stage 1: Use official Jetson PyTorch base image
+# https://catalog.ngc.nvidia.com/orgs/nvidia/containers/l4t-pytorch
+FROM nvcr.io/nvidia/l4t-pytorch:r35.1.0-pth1.13-py3
+
+# Test base image CUDA and PyTorch GPU availability
+RUN echo "🔍 Testing base image CUDA/GPU availability..." && \
+    echo "================================================" && \
+    echo "Python version:" && python3 --version && \
+    echo "================================================" && \
+    echo "NVIDIA-SMI test:" && \
+    (nvidia-smi || echo "❌ nvidia-smi not available in base image") && \
+    echo "================================================" && \
+    echo "NVCC test:" && \
+    (nvcc --version || echo "❌ nvcc not available in base image") && \
+    echo "================================================" && \
+    echo "PyTorch CUDA test:" && \
+    python3 -c "import torch; print('PyTorch version:', torch.__version__); print('CUDA compiled version:', torch.version.cuda); print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('CUDA device name:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'N/A')" && \
+    echo "================================================" && \
+    echo "✅ Base image CUDA/GPU test complete" && \
+    echo "================================================"
 
 # # Stage 2: Transformers image
 # FROM dustynv/transformers:r36.4.2 as transformers-base
@@ -12,6 +30,12 @@ FROM python:3.9-slim
 ENV PYTHONPATH=/workspace
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=UTC
+
+# CUDA environment variables for GPU detection
+ENV CUDA_HOME=/usr/local/cuda
+ENV PATH=${CUDA_HOME}/bin:${PATH}
+ENV LD_LIBRARY_PATH=${CUDA_HOME}/lib64:${LD_LIBRARY_PATH}
+ENV TORCH_CUDA_ARCH_LIST="5.3;6.2;7.2"
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -42,11 +66,37 @@ RUN apt-get update && apt-get install -y \
     liblzma-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Python 3.9 already available in base image
+# Build and install Python 3.9 from source (needed for newer transformers)
+RUN cd /tmp && \
+    wget https://www.python.org/ftp/python/3.9.18/Python-3.9.18.tgz && \
+    tar -xzf Python-3.9.18.tgz && \
+    cd Python-3.9.18 && \
+    ./configure --enable-optimizations --with-ensurepip=install --prefix=/usr/local && \
+    make -j$(nproc) && \
+    make altinstall && \
+    cd / && \
+    rm -rf /tmp/Python-3.9.18*
 
-# Install PyTorch for Python 3.9 (CPU first, CUDA auto-detected)
-# Skip PyTorch installation - will mount from host
-# PyTorch will be mounted from host system
+# Create symlinks for python3.9
+RUN ln -sf /usr/local/bin/python3.9 /usr/local/bin/python3 && \
+    ln -sf /usr/local/bin/pip3.9 /usr/local/bin/pip3
+
+# Update PATH to use Python 3.9
+ENV PATH="/usr/local/bin:$PATH"
+
+# Test CUDA and PyTorch after Python 3.9 installation
+RUN echo "🔍 Testing CUDA/GPU after Python 3.9 installation..." && \
+    echo "================================================" && \
+    echo "Python version after upgrade:" && python3 --version && \
+    echo "Which python3:" && which python3 && \
+    echo "Python3 executable:" && ls -la /usr/local/bin/python3 && \
+    echo "================================================" && \
+    echo "Testing PyTorch import with Python 3.9:" && \
+    (python3 -c "import torch; print('✅ PyTorch imported with Python 3.9'); print('PyTorch version:', torch.__version__); print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count())" || echo "❌ PyTorch not available with Python 3.9 - will need to reinstall") && \
+    echo "================================================" && \
+    echo "✅ Python 3.9 CUDA/GPU test complete" && \
+    echo "================================================"
+
 
 # Install newer SQLite for ChromaDB compatibility
 RUN cd /tmp && \
@@ -73,18 +123,22 @@ COPY requirements.txt .
 # Upgrade pip and build tools
 RUN pip3 install --no-cache-dir --upgrade pip setuptools wheel
 
-# Install Unsloth (PyTorch is already in base image)
-RUN pip3 install --no-cache-dir "unsloth @ git+https://github.com/unslothai/unsloth.git"
-
-# Install all requirements from requirements.txt
+# Install all requirements from requirements.txt (includes unsloth and all other Python deps)
 RUN pip3 install --no-cache-dir -r requirements.txt
 
-# Install additional dependencies that might be needed
-RUN pip3 install --no-cache-dir \
-    pyaudio \
-    psycopg2-binary \
-    opencv-python-headless \
-    sentence-transformers
+# Final CUDA and PyTorch test after all installations
+RUN echo "🔍 Final CUDA/GPU test after all requirements installed..." && \
+    echo "================================================" && \
+    echo "Final Python version:" && python3 --version && \
+    echo "================================================" && \
+    echo "Final PyTorch test:" && \
+    python3 -c "import torch; print('✅ Final PyTorch test'); print('PyTorch version:', torch.__version__); print('CUDA compiled version:', torch.version.cuda); print('CUDA available:', torch.cuda.is_available()); print('CUDA device count:', torch.cuda.device_count()); print('GPU detected:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'No GPU - needs runtime access')" && \
+    echo "================================================" && \
+    echo "Testing other key imports:" && \
+    python3 -c "import transformers; print('✅ transformers version:', transformers.__version__); import accelerate; print('✅ accelerate imported'); exec('try:\\n    import unsloth; print(\\\"✅ unsloth imported\\\")\\nexcept:\\n    print(\\\"⚠️ unsloth import failed\\\")')" && \
+    echo "================================================" && \
+    echo "✅ Final installation test complete" && \
+    echo "================================================"
 
 # Copy application code
 COPY . .
@@ -106,6 +160,9 @@ ENV PYTHONUNBUFFERED=1
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:5050/health || exit 1
+
+# Test GPU detection script
+RUN echo '#!/bin/bash\necho "🔍 Testing GPU detection..."\npython3 -c "import torch; print(f\"PyTorch version: {torch.__version__}\"); print(f\"CUDA available: {torch.cuda.is_available()}\"); print(f\"CUDA version: {torch.version.cuda if torch.cuda.is_available() else \"N/A\"}\"); print(f\"Device count: {torch.cuda.device_count()}\"); print(f\"Device name: {torch.cuda.get_device_name(0) if torch.cuda.is_available() else \"N/A\"}\")"\necho "✅ GPU test complete"' > /workspace/test_gpu.sh && chmod +x /workspace/test_gpu.sh
 
 # Default command
 CMD ["python3", "app.py"] 

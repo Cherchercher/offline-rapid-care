@@ -11,17 +11,18 @@ Pillow>=10.0.0
 opencv-python-headless==4.8.1.78
 numpy>=1.24.0,<2.0.0
 
+# Audio processing
+SpeechRecognition>=3.10.0
+pyaudio>=0.2.11
+
 # AI/ML dependencies for Jetson (PyTorch is in base image)
 transformers>=4.51.3
 accelerate>=0.24.0
-# unsloth installed via official method in Dockerfile
-
-# Audio processing - only what's actually used
-SpeechRecognition>=3.10.0
+unsloth
+sentence-transformers>=2.2.0
 
 # Vector search and embeddings
 chromadb>=0.4.0
-# sentence-transformers>=2.2.0  # Commented out due to TensorFlow conflicts
 timm>=0.9.0
 
 # HTTP requests for API calls

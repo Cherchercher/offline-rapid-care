@@ -1,0 +1,2 @@
+# THIS is the important test
+docker exec offline-gemma-jetson python3 -c "import torch; print('CUDA available:', torch.cuda.is_available())"
