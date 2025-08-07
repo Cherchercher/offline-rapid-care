@@ -10,7 +10,19 @@ Enter **RapidCare** — a groundbreaking solution designed to transform emergenc
 
 This cutting-edge app is designed to operate fully offline on mobile devices, including Google Edge AI, Jetson devices, and web browsers, ensuring optimal performance regardless of connectivity. With intelligent medical triage features like video-based assessments, real-time vitals transcription, and patient reunification capabilities, RapidCare serves as a vital assistant to those working on the frontlines and those desperately seeking information.
 
-## 🐳 Quick Start (Docker)
+## 🐳 Quick Start
+
+### ** running the App (for non Jetsons devices)**
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Download models
+python scripts/download_gemma_models.py --model 4b
+
+# Run the application
+python ./tmux_start.sh
+```
 
 ### **For Jetson Devices:**
 ```bash
@@ -27,17 +39,10 @@ cd offline-gemma
 # Upload Server: http://localhost:11435
 ```
 
-### **For Other Platforms:**
-```bash
-# Install dependencies
-pip install -r requirements.txt
+For detailed setup instructions, system configuration files, and deployment guides see:
 
-# Download models
-python scripts/download_gemma_models.py --model 4b
+[DOCKER_README.md](DOCKER_README.md)
 
-# Run the application
-python app.py
-```
 
 ## 🏗️ Architecture Overview
 
@@ -136,10 +141,10 @@ python app.py
 
 | Platform | Setup Time | Model | Performance | Offline Cap. |
 |----------|------------|-------|-------------|--------------|
-| **Jetson (Docker)** | 5 minutes | 4B | High | ✅ Full |
-| **Google Edge AI** | 10 minutes | 4B | Medium | ✅ Full |
-| **AWS EC2** | 15 minutes | 2B | Medium | ❌ Limited |
-| **Local Desktop** | 20 minutes | 4B | High | ✅ Full |
+| **Jetson (Docker)** | 5 minutes | 4B/2B | High | ✅ Full |
+| **Google Edge AI** | 10 minutes | 4B/2B | Medium | ✅ Full |
+| **AWS EC2** | 15 minutes | 4B/2B | Medium | ❌ Limited |
+| **Local Desktop** | 20 minutes | 2B/4B | High | ✅ Full |
 
 ### **Data Flow Architecture**
 
@@ -226,92 +231,10 @@ With RapidCare, emergency responders and families can navigate the chaos of mass
 
 RapidCare supports multiple roles to ensure comprehensive emergency response:
 
-- **ADMIN**: System oversight and role management
 - **PHYSICIAN**: Medical assessment and treatment decisions
 - **NURSE**: Patient monitoring and vital signs
 - **PARAMEDIC/EMT**: Field triage and emergency care
 - **REUNIFICATION_COORDINATOR**: Family location and patient matching
-- **FIELD_AGENT**: Field operations and coordination
-- **TRANSFER_AGENT**: Patient transfer management
-- **LOGISTICS**: Supply and resource management
-- **MEDICAL_ASSISTANT**: Clinical support and documentation
-
-## 🐳 Docker Management
-
-### **Essential Commands**
-```bash
-# Build and run
-./build_and_run.sh
-
-# View logs
-docker logs -f offline-gemma-jetson
-
-# Stop container
-docker stop offline-gemma-jetson
-
-# Restart container
-docker restart offline-gemma-jetson
-
-# Enter container shell
-docker exec -it offline-gemma-jetson bash
-
-# Check container status
-docker ps
-```
-
-### **Service-Specific Logs**
-```bash
-# Model server logs
-./scripts/view_model_logs.sh
-
-# Flask app logs
-./scripts/view_flask_logs.sh
-
-# Upload server logs
-./scripts/view_upload_logs.sh
-
-# All logs with color coding
-./scripts/view_all_logs.sh
-```
-
-### **Troubleshooting**
-```bash
-# Check if all services are running
-docker exec offline-gemma-jetson ps aux | grep python
-
-# Test model server health
-curl http://localhost:5001/health
-
-# Check GPU access
-docker exec offline-gemma-jetson nvidia-smi
-
-# Monitor resource usage
-docker stats offline-gemma-jetson
-```
-
-## 🏆 Prize Alignment
-
-RapidCare is designed to compete for multiple prizes by showcasing different aspects of our architecture:
-
-### **The Jetson Prize**
-For the best demonstration of on-device power by deploying a Gemma 3n product on an NVIDIA Jetson device.
-
-**Our Approach**: RapidCare runs fully offline on Jetson devices with intelligent dual-model support (2B and 4B), automatically selecting the optimal model based on system load. This ensures maximum performance while maintaining reliability during critical emergency response scenarios. When internet connectivity is lost, data is stored locally and synced when connectivity returns.
-
-### **The Google AI Edge Prize**
-For the most compelling and effective use case built using the Google AI Edge implementation of Gemma 3n.
-
-**Our Approach**: We leverage Google Edge AI with dynamic model selection, automatically choosing between 2B and 4B models based on system load and task complexity. This ensures optimal performance across different edge devices while maintaining reliability during critical emergency response scenarios.
-
-### **The Local AI Prize**
-For the best project that utilizes and showcases the capabilities of Gemma 3n running locally via direct model inference.
-
-**Our Approach**: Our local-first architecture uses intelligent model selection to run both Gemma 3n 2B and 4B models locally, automatically choosing the optimal model based on system load and task requirements. This demonstrates real-world production scenarios where organizations must balance performance with resource constraints, ensuring reliable operation across diverse hardware environments.
-
-### **The Unsloth Prize**
-For the best fine-tuned Gemma 3n model created using Unsloth, optimized for a specific, impactful task.
-
-**Our Approach**: We fine-tune both Gemma 3n 2B and 4B models specifically for mass casualty incident response, optimizing for medical triage, patient reunification, and emergency coordination tasks across different deployment scenarios.
 
 ## 🧠 Technical Architecture
 
@@ -346,6 +269,12 @@ Our architecture supports intelligent model selection based on system load and a
 - **Moderate Load** (60-80% CPU, 70-85% memory): Uses 2B for quick tasks, 4B for complex tasks
 - **Low Load** (<60% CPU, <70% memory): Leverages 4B model for maximum performance
 
+## 🏆 Prize Alignment
+
+RapidCare leverages the multi-modal capacity of Gemma3n deployed on multiple devices including Web, Android with Google Edge AI, and Jetson. In addition, we fine-tuned the gemm3n 4b model with image data using Unsloth to facilitate visual medical triage.
+
+It is designed specifically for mass casualty incident response, optimizing for medical triage, patient reunification, and emergency coordination tasks across different deployment scenarios with limited internet access.
+
 ## 🚀 Future Enhancements
 
 ### **Multi-Language Support**
@@ -359,12 +288,6 @@ Our architecture supports intelligent model selection based on system load and a
 - **Transfer Coordination**: Automated patient transfer scheduling and routing
 - **Resource Tracking**: Monitor medical supplies, equipment, and personnel availability
 - **Capacity Planning**: Predictive analytics for resource allocation during mass casualty events
-
-### **Advanced AI Model Fine-tuning**
-- **Specialized Training**: Fine-tune models for specific medical specialties (trauma, pediatrics, geriatrics)
-- **Regional Adaptation**: Train models on local medical protocols and regional health guidelines
-- **Continuous Learning**: Implement feedback loops to improve model accuracy based on real-world outcomes
-- **Specialized Tasks**: Custom training for wound assessment, medication interaction checking, and vital sign interpretation
 
 ### **Enhanced Offline Capabilities**
 - **Distributed Processing**: Multi-device coordination for large-scale incidents
@@ -390,6 +313,13 @@ Our architecture supports intelligent model selection based on system load and a
 - **Access Control**: Role-based permissions and multi-factor authentication
 - **Data Governance**: Automated data retention and disposal policies
 
+### *Fine-tuning With Real Medical Data**
+- **Specialized Training**: Fine-tune models for specific medical specialties (trauma, pediatrics, geriatrics)
+- **Regional Adaptation**: Train models on local medical protocols and regional health guidelines
+- **Continuous Learning**: Implement feedback loops to improve model accuracy based on real-world outcomes
+- **Specialized Tasks**: Custom training for wound assessment, medication interaction checking, and vital sign interpretation
+
+
 ### **Mobile & Edge Computing**
 - **5G Integration**: Ultra-low latency communication for real-time collaboration
 - **Edge AI**: Distributed AI processing across multiple edge devices
@@ -414,11 +344,6 @@ Our architecture supports intelligent model selection based on system load and a
 - **A/B Testing**: Continuous improvement through controlled experimentation
 - **Academic Partnerships**: Collaboration with medical schools and research institutions
 
-## 📚 Documentation
-
-For detailed setup instructions, system configuration files, and deployment guides, see:
-- **[Setup Guide](setup_guide.md)** - Complete deployment and configuration instructions
-- **[TODO.md](TODO.md)** - Jetson device setup and advanced features
 
 This approach demonstrates real-world production scenarios where organizations must balance performance with resource constraints, automatically optimizing for the best possible response quality given current system conditions.
 
@@ -428,7 +353,7 @@ RapidCare operates in three connectivity modes:
 
 1. **Online Mode**: Full cloud sync and real-time collaboration
 2. **Offline Mode**: Local processing with data caching
-3. **Hybrid Mode**: Selective sync when connectivity is intermittent
+3. **Hybrid Mode**: Selective sync when connectivity is intermittent (TODO)
 
 ### **Real-Time System Monitoring**
 
@@ -580,3 +505,58 @@ The project includes various development and utility scripts in the `scripts/` f
 
 For detailed information about available scripts, see `scripts/README.md`.
 
+
+
+
+## 🐳 Docker Management
+
+### **Essential Commands**
+```bash
+# Build and run
+./build_and_run.sh
+
+# View logs
+docker logs -f offline-gemma-jetson
+
+# Stop container
+docker stop offline-gemma-jetson
+
+# Restart container
+docker restart offline-gemma-jetson
+
+# Enter container shell
+docker exec -it offline-gemma-jetson bash
+
+# Check container status
+docker ps
+```
+
+### **Service-Specific Logs**
+```bash
+# Model server logs
+./scripts/view_model_logs.sh
+
+# Flask app logs
+./scripts/view_flask_logs.sh
+
+# Upload server logs
+./scripts/view_upload_logs.sh
+
+# All logs with color coding
+./scripts/view_all_logs.sh
+```
+
+### **Troubleshooting**
+```bash
+# Check if all services are running
+docker exec offline-gemma-jetson ps aux | grep python
+
+# Test model server health
+curl http://localhost:5001/health
+
+# Check GPU access
+docker exec offline-gemma-jetson nvidia-smi
+
+# Monitor resource usage
+docker stats offline-gemma-jetson
+```
